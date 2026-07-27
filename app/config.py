@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     QDRANT_API_KEY: str | None = None
     QDRANT_COLLECTION: str = "enterprise_rag"
 
+    # --- PINECONE VECTOR DB ---
+    PINECONE_API_KEY: str | None = None
+    PINECONE_COLLECTION: str = "legal_enterprise_rag"
+
     # --- NEON SERVERLESS POSTGRES (LangGraph checkpointer) ---
     NEON_DB_URL: str
 
@@ -61,10 +65,10 @@ class Settings(BaseSettings):
     LANGSMITH_PROJECT: str = "rag_scale_test"
     LANGSMITH_ENDPOINT: str = "https://api.smith.langchain.com"
 
-    @field_validator("QDRANT_API_KEY", mode="before")
+    @field_validator("PINECONE_API_KEY", mode="before")
     @classmethod
-    def _empty_qdrant_key_as_none(cls, v):
-        """Treat empty QDRANT_API_KEY as unset so local Qdrant doesn't receive a blank header."""
+    def _empty_pinecone_key_as_none(cls, v):
+        """Treat empty PINECONE_API_KEY as unset so local Pinecone doesn't receive a blank header."""
         if v == "" or v is None:
             return None
         return v

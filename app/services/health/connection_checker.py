@@ -13,7 +13,7 @@ from typing import Callable
 import logfire
 import requests
 from psycopg_pool import ConnectionPool
-from qdrant_client import QdrantClient
+from pinecone import Pinecone
 from redis import Redis
 
 from app.config import settings
@@ -84,19 +84,15 @@ def _check_upstash_redis() -> ConnectionResult:
         return ConnectionResult("redis", False, str(e))
 
 
-def _check_qdrant() -> ConnectionResult:
-    """Verify Qdrant cluster is reachable."""
+def _check_pinecone() -> ConnectionResult:
+    """Verify Pinecone is reachable."""
     try:
-        client = QdrantClient(
-            url=settings.QDRANT_URL,
-            api_key=settings.QDRANT_API_KEY,
-            timeout=5,
-        )
+        client = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
         client.get_collections()
-        return ConnectionResult("qdrant", True, "Qdrant reachable")
+        return ConnectionResult("Pinecone", True, "Pinecone reachable")
     except Exception as e:
-        logfire.warning(f"Qdrant health check failed: {e}")
-        return ConnectionResult("qdrant", False, str(e))
+        logfire.warning(f"Pinecone health check failed: {e}")
+        return ConnectionResult("Pinecone", False, str(e))
 
 
 def _check_portkey_gateway() -> ConnectionResult:
@@ -207,7 +203,7 @@ def _check_langsmith() -> ConnectionResult:
 _CHECKERS: list[Callable[[], ConnectionResult]] = [
     _check_neon_postgres,
     _check_upstash_redis,
-    _check_qdrant,
+    _check_pinecone,
     _check_portkey_gateway,
     _check_jina_embeddings,
     _check_jina_reranker,

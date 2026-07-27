@@ -1,7 +1,7 @@
 import logfire
 
 from app.agents.state import AgentState
-from app.services.retrieval.qdrant_service import search_enterprise_knowledge
+from app.services.retrieval.vectordb_service import search_enterprise_knowledge
 from app.services.retrieval.ranking_service import rerank_documents
 
 
@@ -13,7 +13,7 @@ def retrieve_node(state: AgentState):
 
     # Standard Retrieval Logic
     with logfire.span("🔍 Knowledge Retrieval"):
-        logfire.info(f"Searching Qdrant for: {query}")
+        logfire.info(f"Searching Pinecone for: {query}")
         raw_results = search_enterprise_knowledge(query, limit=15)
         logfire.info(f"Retrieved {len(raw_results)} candidates from Vector DB")
 

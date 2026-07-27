@@ -32,11 +32,9 @@ MASTER_INDEX_NAME = getattr(settings, "PINECONE_INDEX_NAME", "legal-enterprise-k
 
 
 # Load Metadata globally to avoid reading the file repeatedly
-# Note: Using \t separator based on your sample data format. Adjust to ',' if it's a standard CSV.
 METADATA_CSV_PATH = r"C:\Users\anupa\OneDrive\Desktop\Anupam\workshop\Advance_Rag_youtube\CUDA_Rag\DATA\master_clauses_updated_final.csv"
 if os.path.exists(METADATA_CSV_PATH):
     df_meta = pd.read_csv(METADATA_CSV_PATH,encoding='Windows-1252').fillna("")
-    # Create a mapping of Filename -> Dictionary of all row data
     METADATA_MAP = df_meta.set_index("Filename").to_dict(orient="index")
 else:
     #logfire.warning("metadata.csv not found. Operating without extended metadata.")

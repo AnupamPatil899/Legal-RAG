@@ -48,6 +48,9 @@ commands.md
 
 .logfire
 
+temp.py
+test_logfire.py
+
 tenvv
 
 # Claude Code memory & session data

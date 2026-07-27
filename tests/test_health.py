@@ -27,7 +27,7 @@ def test_ready_when_all_dependencies_healthy():
     results = {
         "postgres": _ok("postgres"),
         "redis": _ok("redis"),
-        "qdrant": _ok("qdrant"),
+        "pinecone": _ok("pinecone"),
         "llm_gateway": _ok("llm_gateway"),
         "jina_embeddings": _ok("jina_embeddings"),
         "jina_reranker": _ok("jina_reranker"),
@@ -46,7 +46,7 @@ def test_ready_returns_503_when_any_dependency_fails():
     results = {
         "postgres": _ok("postgres"),
         "redis": _ok("redis"),
-        "qdrant": _fail("qdrant", "qdrant down"),
+        "pinecone": _fail("pinecone", "pinecone down"),
         "llm_gateway": _ok("llm_gateway"),
         "jina_embeddings": _ok("jina_embeddings"),
         "jina_reranker": _ok("jina_reranker"),
@@ -58,4 +58,4 @@ def test_ready_returns_503_when_any_dependency_fails():
     assert response.status_code == 503
     data = response.json()
     assert data["status"] == "not_ready"
-    assert data["checks"]["qdrant"].startswith("unavailable")
+    assert data["checks"]["pinecone"].startswith("unavailable")

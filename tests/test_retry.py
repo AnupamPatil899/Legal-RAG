@@ -2,15 +2,15 @@
 
 from unittest.mock import MagicMock, patch
 
-from app.services.retrieval.qdrant_service import search_enterprise_knowledge
+from app.services.retrieval.vectordb_service import search_enterprise_knowledge
 from app.services.retrieval.ranking_service import rerank_documents
 
 
-def test_qdrant_search_retries_then_returns_empty():
-    """Qdrant search should retry transient failures and finally return []."""
+def test_pinecone_search_retries_then_returns_empty():
+    """Pinecone search should retry transient failures and finally return []."""
     with (
-        patch("app.services.retrieval.qdrant_service.client") as mock_client,
-        patch("app.services.retrieval.qdrant_service.embed_query") as mock_embed,
+        patch("app.services.retrieval.vectordb_service.pc") as mock_client,
+        patch("app.services.retrieval.vectordb_service.embed_query") as mock_embed,
     ):
         mock_embed.return_value = [0.0] * 10
         mock_client.query_points.side_effect = RuntimeError("transient")

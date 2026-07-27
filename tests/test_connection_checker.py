@@ -10,7 +10,7 @@ from app.services.health.connection_checker import (
     _check_jina_reranker,
     _check_neon_postgres,
     _check_portkey_gateway,
-    _check_qdrant,
+    _check_pinecone,
     _check_upstash_redis,
     check_all_connections,
 )
@@ -56,18 +56,18 @@ def test_check_upstash_redis_failure():
     assert result.healthy is False
 
 
-def test_check_qdrant_success():
+def test_check_pinecone_success():
     mock_client = MagicMock()
-    with patch("app.services.health.connection_checker.QdrantClient", return_value=mock_client):
-        result = _check_qdrant()
+    with patch("app.services.health.connection_checker.client", return_value=mock_client):
+        result = _check_pinecone()
     assert result.healthy is True
-    assert result.name == "qdrant"
+    assert result.name == "pinecone"
     mock_client.get_collections.assert_called_once()
 
 
-def test_check_qdrant_failure():
-    with patch("app.services.health.connection_checker.QdrantClient", side_effect=Exception("unauthorized")):
-        result = _check_qdrant()
+def test_check_pinecone_failure():
+    with patch("app.services.health.connection_checker.client", side_effect=Exception("unauthorized")):
+        result = _check_pinecone()
     assert result.healthy is False
 
 
@@ -128,7 +128,7 @@ def test_check_all_connections_returns_all_results():
     mock_checkers = [
         lambda: _ok("postgres"),
         lambda: _ok("redis"),
-        lambda: _ok("qdrant"),
+        lambda: _ok("pinecone"),
         lambda: _ok("llm_gateway"),
         lambda: _ok("jina_embeddings"),
         lambda: _fail("jina_reranker"),

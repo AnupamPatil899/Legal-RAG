@@ -23,19 +23,13 @@ def initialize_rails() -> None:
     api_key=settings.PORTKEY_API_KEY,
     base_url="https://api.portkey.ai/v1", # Required: Redirects the request to Portkey
     model="llama-3.3-70b-versatile",      # Keep just the clean model name
-    default_headers={
-        # Use this if your slug is a Portkey Config ID:
-        "x-portkey-virtual-key": settings.PORTKEY_PRIMARY_SLUG 
-        
-        # OR, if your slug is actually a Portkey Virtual Key, use this instead:
-        # "x-portkey-virtual-key": settings.PORTKEY_PRIMARY_SLUG
-    }
+    default_headers={"x-portkey-virtual-key": settings.PORTKEY_PRIMARY_SLUG }
 )
 
     config = RailsConfig.from_content(colang_content=COLANG_CONTENT, yaml_content=YAML_CONTENT)
 
     _rails = LLMRails(config, llm=guard_llm)
-    logfire.info("🛡️ NeMo Guardrails initialised (gpt-5-mini).")
+    logfire.info("🛡️ NeMo Guardrails initialised (llama-3.3-70b-versatile).")
 
 
 def guard(message: str) -> tuple[bool, str | None]:
