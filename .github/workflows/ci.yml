@@ -45,6 +45,6 @@ jobs:
           NEON_DB_URL: postgres://dummy:dummy@dummy.db:5432/dummy
           UPSTASH_REDIS_REST_URL: https://dummy.example.com
           UPSTASH_REDIS_REST_TOKEN: dummy
-          PINECONE_API_KEY: dummy
+          PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
         run: |
           pytest tests/
