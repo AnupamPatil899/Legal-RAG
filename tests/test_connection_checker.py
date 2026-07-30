@@ -58,16 +58,28 @@ def test_check_upstash_redis_failure():
 
 def test_check_pinecone_success():
     mock_client = MagicMock()
-    with patch("app.services.health.connection_checker.client", return_value=mock_client):
+
+    with patch(
+        "app.services.health.connection_checker.Pinecone",
+        return_value=mock_client,
+    ):
         result = _check_pinecone()
+
     assert result.healthy is True
-    assert result.name == "pinecone"
+    assert result.name == "Pinecone"   # or change your production code to return "pinecone"
     mock_client.get_collections.assert_called_once()
 
 
 def test_check_pinecone_failure():
-    with patch("app.services.health.connection_checker.client", side_effect=Exception("unauthorized")):
+    mock_client = MagicMock()
+    mock_client.get_collections.side_effect = Exception("unauthorized")
+
+    with patch(
+        "app.services.health.connection_checker.Pinecone",
+        return_value=mock_client,
+    ):
         result = _check_pinecone()
+
     assert result.healthy is False
 
 

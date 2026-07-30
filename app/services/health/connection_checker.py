@@ -91,10 +91,10 @@ def _check_pinecone() -> ConnectionResult:
     """Verify Pinecone is reachable."""
     try:
         client.get_collections()
-        return ConnectionResult("Pinecone", True, "Pinecone reachable")
+        return ConnectionResult("pinecone", True, "Pinecone reachable")
     except Exception as e:
         logfire.warning(f"Pinecone health check failed: {e}")
-        return ConnectionResult("Pinecone", False, str(e))
+        return ConnectionResult("pinecone", False, str(e))
 
 
 def _check_portkey_gateway() -> ConnectionResult:
