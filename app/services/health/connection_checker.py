@@ -88,9 +88,8 @@ def _check_upstash_redis() -> ConnectionResult:
 
 
 def _check_pinecone() -> ConnectionResult:
-    """Verify Pinecone is reachable."""
     try:
-        client.get_collections()
+        client.list_indexes()
         return ConnectionResult("pinecone", True, "Pinecone reachable")
     except Exception as e:
         logfire.warning(f"Pinecone health check failed: {e}")
