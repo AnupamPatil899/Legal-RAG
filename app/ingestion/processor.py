@@ -97,9 +97,9 @@ def process_file(file_path: str, filename: str, source_type: str):
             if not chunks:
                 return
 
-            local_path = save_processed_locally(# noqa: F841
+            save_processed_locally(# noqa: F841
                 {"filename": filename, "source_type": source_type, "chunks": chunks}, source_type, filename
-            )  
+            )
 
             # 3. Grab Metadata (folder_name is already inside file_meta)
             file_meta = METADATA_MAP.get(filename, {})
