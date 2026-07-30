@@ -9,7 +9,7 @@ from app.services.retrieval.vectordb_service import search_enterprise_knowledge
 def test_pinecone_search_retries_then_returns_empty():
     """Pinecone search should retry transient failures and finally return []."""
     with (
-        patch("app.services.retrieval.vectordb_service.pc") as mock_client,
+        patch("app.services.retrieval.vectordb_service.client") as mock_client,
         patch("app.services.retrieval.vectordb_service.embed_query") as mock_embed,
     ):
         mock_embed.return_value = [0.0] * 10

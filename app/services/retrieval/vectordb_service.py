@@ -13,7 +13,7 @@ load_dotenv()
 
 
 # Initialize Pinecone Client & BM25 Encoder
-pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
+client = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 bm25 = BM25Encoder.default()
 
 MASTER_INDEX_NAME = getattr(settings, "PINECONE_INDEX_NAME", "legal-enterprise-knowledge-base")
@@ -31,7 +31,7 @@ def _search_enterprise_knowledge(query: str, folder_name: str = None, limit: int
     sparse_vector = bm25.encode_queries(query)
 
     # 1. Connect to the Single Master Index
-    index = pc.Index(MASTER_INDEX_NAME)
+    index = client.Index(MASTER_INDEX_NAME)
 
     # 2. Build the Metadata Filter
     search_kwargs = {"vector": dense_vector, "sparse_vector": sparse_vector, "top_k": limit, "include_metadata": True}
