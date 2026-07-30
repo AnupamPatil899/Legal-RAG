@@ -97,7 +97,7 @@ def process_file(file_path: str, filename: str, source_type: str):
             if not chunks:
                 return
 
-            save_processed_locally(# noqa: F841
+            save_processed_locally(  # noqa: F841
                 {"filename": filename, "source_type": source_type, "chunks": chunks}, source_type, filename
             )
 
