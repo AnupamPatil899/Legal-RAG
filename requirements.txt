@@ -19,6 +19,7 @@ torch                        # Required by sentence-transformers
 # --- VECTOR DB & RETRIEVAL ---
 qdrant-client               # Vector Database for semantic search
 pinecone
+pinecone-text
 
 # --- LANGCHAIN & AGENTIC ORCHESTRATION ---
 langchain                   # Core LLM orchestration
