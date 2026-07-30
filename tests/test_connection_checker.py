@@ -66,7 +66,7 @@ def test_check_pinecone_success():
         result = _check_pinecone()
 
     assert result.healthy is True
-    assert result.name == "Pinecone"   # or change your production code to return "pinecone"
+    assert result.name == "Pinecone"  # or change your production code to return "pinecone"
     mock_client.get_collections.assert_called_once()
 
 
