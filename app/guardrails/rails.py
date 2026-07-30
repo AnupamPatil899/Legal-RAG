@@ -15,16 +15,16 @@ def initialize_rails() -> None:
     """
     global _rails
 
-   #guard_llm = ChatOpenAI(api_key=settings.OPENAI_API_KEY, model="gpt-5-mini")
+    # guard_llm = ChatOpenAI(api_key=settings.OPENAI_API_KEY, model="gpt-5-mini")
 
-    #guard_llm = ChatOpenAI(api_key=settings.PORTKEY_API_KEY,model=f"@{settings.PORTKEY_PRIMARY_SLUG}/llama-3.3-70b-versatile")
-    
+    # guard_llm = ChatOpenAI(api_key=settings.PORTKEY_API_KEY,model=f"@{settings.PORTKEY_PRIMARY_SLUG}/llama-3.3-70b-versatile")
+
     guard_llm = ChatOpenAI(
-    api_key=settings.PORTKEY_API_KEY,
-    base_url="https://api.portkey.ai/v1", # Required: Redirects the request to Portkey
-    model="llama-3.3-70b-versatile",      # Keep just the clean model name
-    default_headers={"x-portkey-virtual-key": settings.PORTKEY_PRIMARY_SLUG }
-)
+        api_key=settings.PORTKEY_API_KEY,
+        base_url="https://api.portkey.ai/v1",  # Required: Redirects the request to Portkey
+        model="llama-3.3-70b-versatile",  # Keep just the clean model name
+        default_headers={"x-portkey-virtual-key": settings.PORTKEY_PRIMARY_SLUG},
+    )
 
     config = RailsConfig.from_content(colang_content=COLANG_CONTENT, yaml_content=YAML_CONTENT)
 

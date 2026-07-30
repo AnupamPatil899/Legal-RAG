@@ -3,7 +3,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 import os
 import sys
-import os
+
 from dotenv import find_dotenv
 
 print("ENV FILE:", find_dotenv())
@@ -16,7 +16,7 @@ load_dotenv(override=True)
 
 import logfire
 
-logfire.configure(token=os.getenv("LOGFIRE_TOKEN"), service_name="evals",send_to_logfire=False)
+logfire.configure(token=os.getenv("LOGFIRE_TOKEN"), service_name="evals", send_to_logfire=False)
 print(os.getenv("LOGFIRE_TOKEN"))
 # ─────────────────────────────────────────────────────────────────────────────
 import asyncio

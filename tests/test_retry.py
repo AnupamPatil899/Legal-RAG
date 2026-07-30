@@ -2,8 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
-from app.services.retrieval.vectordb_service import search_enterprise_knowledge
 from app.services.retrieval.ranking_service import rerank_documents
+from app.services.retrieval.vectordb_service import search_enterprise_knowledge
 
 
 def test_pinecone_search_retries_then_returns_empty():

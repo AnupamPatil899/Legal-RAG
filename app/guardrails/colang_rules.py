@@ -97,8 +97,8 @@ define flow farewell
   bot express farewell
 """
 
-    # engine: openai
-    # model: gpt-3.5-turbo
+# engine: openai
+# model: gpt-3.5-turbo
 YAML_CONTENT = """
 models:
   - type: main

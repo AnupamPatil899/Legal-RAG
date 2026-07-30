@@ -1,6 +1,6 @@
 from typing import List
 
-#import logfire
+# import logfire
 
 
 def chunk_text(text: str, chunk_size: int = 1500) -> List[str]:
@@ -8,8 +8,8 @@ def chunk_text(text: str, chunk_size: int = 1500) -> List[str]:
     Simple semantic-ish chunker that splits by paragraphs.
     Ensures chunks do not exceed the specified size.
     """
-    #with logfire.span("✂️ Text Chunking", text_length=len(text)):
-    if 2>1:
+    # with logfire.span("✂️ Text Chunking", text_length=len(text)):
+    if 2 > 1:
         if not text.strip():
             return []
 
@@ -29,6 +29,6 @@ def chunk_text(text: str, chunk_size: int = 1500) -> List[str]:
             chunks.append(current_chunk.strip())
 
         valid_chunks = [c for c in chunks if c.strip()]
-        #logfire.info(f"✅ Generated {len(valid_chunks)} chunks")
+        # logfire.info(f"✅ Generated {len(valid_chunks)} chunks")
         print(f"✅ Generated {len(valid_chunks)} chunks")
         return valid_chunks

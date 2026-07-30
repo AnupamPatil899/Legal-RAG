@@ -9,8 +9,8 @@ from app.services.health.connection_checker import (
     _check_jina_embeddings,
     _check_jina_reranker,
     _check_neon_postgres,
-    _check_portkey_gateway,
     _check_pinecone,
+    _check_portkey_gateway,
     _check_upstash_redis,
     check_all_connections,
 )

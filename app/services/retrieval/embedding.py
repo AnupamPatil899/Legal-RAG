@@ -1,6 +1,6 @@
-#import logfire
+# import logfire
 import requests
-from tenacity import before_sleep_log, retry, stop_after_attempt, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.config import settings
 
@@ -21,7 +21,7 @@ def _load_fallback():
     """Load the local mxbai fallback model."""
     from sentence_transformers import SentenceTransformer
 
-    #logfire.info(f"Loading fallback embedding model ({_FALLBACK_MODEL}, {_EMBEDDING_DIM}-dim).")
+    # logfire.info(f"Loading fallback embedding model ({_FALLBACK_MODEL}, {_EMBEDDING_DIM}-dim).")
     print(f"Loading fallback embedding model ({_FALLBACK_MODEL}, {_EMBEDDING_DIM}-dim).")
     return SentenceTransformer(_FALLBACK_MODEL)
 
@@ -29,7 +29,7 @@ def _load_fallback():
 def _probe_jina_api() -> bool:
     """Verify the Jina Embeddings API is reachable with the configured key."""
     if not settings.JINA_API_KEY:
-        #logfire.info("JINA_API_KEY not set — will use local fallback embeddings.")
+        # logfire.info("JINA_API_KEY not set — will use local fallback embeddings.")
         print("JINA_API_KEY not set — will use local fallback embeddings.")
         return False
 
@@ -52,12 +52,12 @@ def _probe_jina_api() -> bool:
         payload = response.json()
         if not payload.get("data"):
             raise RuntimeError("Jina API returned empty data")
-        #logfire.info("Jina Embeddings API ready (jina-embeddings-v3, 1024-dim).")
+        # logfire.info("Jina Embeddings API ready (jina-embeddings-v3, 1024-dim).")
         print("Jina Embeddings API ready (jina-embeddings-v3, 1024-dim).")
-        
+
         return True
     except Exception as e:
-        #logfire.warning(f"Jina Embeddings API probe failed: {e}. Will use local fallback embeddings.")
+        # logfire.warning(f"Jina Embeddings API probe failed: {e}. Will use local fallback embeddings.")
         print(f"Jina Embeddings API probe failed: {e}. Will use local fallback embeddings.")
         return False
 
@@ -92,7 +92,7 @@ def get_embedding_dim() -> int:
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=1, max=5),
     reraise=True,
-   # before_sleep=before_sleep_log(logfire, "warning"),
+    # before_sleep=before_sleep_log(logfire, "warning"),
 )
 def _embed_jina_batch(texts: list[str], task: str) -> list[list[float]]:
     """Call the Jina Embeddings API for a single batch."""
@@ -124,8 +124,8 @@ def _embed_jina(texts: list[str], task: str) -> list[list[float]]:
     all_embeddings: list[list[float]] = []
     for i in range(0, len(texts), BATCH_SIZE):
         batch = texts[i : i + BATCH_SIZE]
-        #with logfire.span("Embed batch via Jina API", start=i, size=len(batch)):
-        if 2>1:
+        # with logfire.span("Embed batch via Jina API", start=i, size=len(batch)):
+        if 2 > 1:
             embeddings = _embed_jina_batch(batch, task)
             all_embeddings.extend(embeddings)
     return all_embeddings
@@ -145,8 +145,8 @@ def _embed_fallback(texts: list[str]) -> list[list[float]]:
     all_embeddings: list[list[float]] = []
     for i in range(0, len(texts), BATCH_SIZE):
         batch = texts[i : i + BATCH_SIZE]
-        #with logfire.span("Embed batch via fallback model", start=i, size=len(batch)):
-        if 2>1:
+        # with logfire.span("Embed batch via fallback model", start=i, size=len(batch)):
+        if 2 > 1:
             all_embeddings.extend(_embed_fallback_batch(batch))
     return all_embeddings
 
@@ -158,7 +158,7 @@ def _ensure_fallback():
     """Switch to the local fallback model if not already active."""
     global _active_model, _model_type
     if _model_type != "fallback":
-       # logfire.warning("Switching to local fallback embeddings.")
+        # logfire.warning("Switching to local fallback embeddings.")
         print("Switching to local fallback embeddings.")
         _active_model = _load_fallback()
         _model_type = "fallback"
@@ -172,7 +172,7 @@ def _embed(texts: list[str], task: str) -> list[list[float]]:
         try:
             return _embed_jina(texts, task)
         except Exception as e:
-            #logfire.error(f"Jina Embeddings API failed: {e}. Falling back to local model.")
+            # logfire.error(f"Jina Embeddings API failed: {e}. Falling back to local model.")
             print(f"Jina Embeddings API failed: {e}. Falling back to local model.")
             _ensure_fallback()
 

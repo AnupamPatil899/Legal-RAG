@@ -7,13 +7,14 @@ Run from the command line:
 
 from __future__ import annotations
 
+import os
 import sys
 from typing import Callable
 
 import logfire
 import requests
-from psycopg_pool import ConnectionPool
 from pinecone import Pinecone
+from psycopg_pool import ConnectionPool
 from redis import Redis
 
 from app.config import settings

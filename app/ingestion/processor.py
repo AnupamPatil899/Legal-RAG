@@ -3,7 +3,7 @@ import os
 import sys
 import uuid
 import pandas as pd
-#import logfire
+# import logfire
 
 from pinecone import Pinecone, ServerlessSpec
 from pinecone_text.sparse import BM25Encoder
@@ -34,10 +34,10 @@ MASTER_INDEX_NAME = getattr(settings, "PINECONE_INDEX_NAME", "legal-enterprise-k
 # Load Metadata globally to avoid reading the file repeatedly
 METADATA_CSV_PATH = r"C:\Users\anupa\OneDrive\Desktop\Anupam\workshop\Advance_Rag_youtube\CUDA_Rag\DATA\master_clauses_updated_final.csv"
 if os.path.exists(METADATA_CSV_PATH):
-    df_meta = pd.read_csv(METADATA_CSV_PATH,encoding='Windows-1252').fillna("")
+    df_meta = pd.read_csv(METADATA_CSV_PATH, encoding="Windows-1252").fillna("")
     METADATA_MAP = df_meta.set_index("Filename").to_dict(orient="index")
 else:
-    #logfire.warning("metadata.csv not found. Operating without extended metadata.")
+    # logfire.warning("metadata.csv not found. Operating without extended metadata.")
     print("metadata.csv not found. Operating without extended metadata.")
     METADATA_MAP = {}
 
@@ -47,10 +47,10 @@ if MASTER_INDEX_NAME not in pc.list_indexes().names():
     pc.create_index(
         name=MASTER_INDEX_NAME,
         dimension=dim,
-        metric="dotproduct", # Required for Hybrid Search
-        spec=ServerlessSpec(cloud="aws", region="us-east-1")
+        metric="dotproduct",  # Required for Hybrid Search
+        spec=ServerlessSpec(cloud="aws", region="us-east-1"),
     )
-    #logfire.info(f"Created new master Pinecone index: {MASTER_INDEX_NAME}")
+    # logfire.info(f"Created new master Pinecone index: {MASTER_INDEX_NAME}")
     print(f"Created new master Pinecone index: {MASTER_INDEX_NAME}")
 
 # Connect to the single master index
@@ -65,9 +65,10 @@ def save_processed_locally(data: dict, source_type: str, filename: str) -> str:
         json.dump(data, f, ensure_ascii=False, indent=2)
     return dest
 
+
 def process_file(file_path: str, filename: str, source_type: str):
-    #with logfire.span("Processing File", file=filename, source=source_type):
-    if 2>1:
+    # with logfire.span("Processing File", file=filename, source=source_type):
+    if 2 > 1:
         try:
             # 1. Extract text
             ext = filename.lower().rsplit(".", 1)[-1]
@@ -79,14 +80,15 @@ def process_file(file_path: str, filename: str, source_type: str):
                 full_text = parse_text(file_path)
             elif ext in ("docx", "pptx"):
                 from app.ingestion.loaders.office import parse_office
+
                 full_text = parse_office(file_path)
             else:
-                #logfire.warning(f"Skipping unsupported file type: {filename}")
+                # logfire.warning(f"Skipping unsupported file type: {filename}")
                 print(f"Skipping unsupported file type: {filename}")
                 return
 
             if not full_text or not full_text.strip():
-                #logfire.warning(f"No text extracted from {filename} — skipping.")
+                # logfire.warning(f"No text extracted from {filename} — skipping.")
                 print(f"No text extracted from {filename} — skipping.")
                 return
 
@@ -95,54 +97,53 @@ def process_file(file_path: str, filename: str, source_type: str):
             if not chunks:
                 return
 
-            local_path = save_processed_locally({
-                "filename": filename, "source_type": source_type, "chunks": chunks
-            }, source_type, filename)
+            local_path = save_processed_locally(
+                {"filename": filename, "source_type": source_type, "chunks": chunks}, source_type, filename
+            )  # noqa: F841
 
             # 3. Grab Metadata (folder_name is already inside file_meta)
             file_meta = METADATA_MAP.get(filename, {})
             # Ensure folder_name exists so we can filter on it later
             if "folder_name" not in file_meta:
-                file_meta["folder_name"] = source_type 
+                file_meta["folder_name"] = source_type
 
             # 4. Vectorize & Upsert to Master Index
-           # with logfire.span("Vectorizing & Indexing"):
-            if 2>1:
+            # with logfire.span("Vectorizing & Indexing"):
+            if 2 > 1:
                 dense_embeddings = embed_texts(chunks)
                 sparse_embeddings = bm25.encode_documents(chunks)
 
                 points = []
                 for chunk, dense, sparse in zip(chunks, dense_embeddings, sparse_embeddings):
-                    payload = dict(file_meta) 
+                    payload = dict(file_meta)
                     payload["text"] = chunk
                     payload["source"] = filename
                     payload["source_type"] = source_type
 
-                    points.append({
-                        "id": str(uuid.uuid4()),
-                        "values": dense,
-                        "sparse_values": sparse,
-                        "metadata": payload
-                    })
+                    points.append(
+                        {"id": str(uuid.uuid4()), "values": dense, "sparse_values": sparse, "metadata": payload}
+                    )
 
                 master_index.upsert(vectors=points)
-                #logfire.info(f"Indexed {len(points)} points to '{MASTER_INDEX_NAME}'.")
+                # logfire.info(f"Indexed {len(points)} points to '{MASTER_INDEX_NAME}'.")
                 print(f"Indexed {len(points)} points to '{MASTER_INDEX_NAME}'.")
 
         except Exception as e:
-            #logfire.error(f"Failed to process {filename}: {e}")
+            # logfire.error(f"Failed to process {filename}: {e}")
             print(f"Failed to process {filename}: {e}")
 
+
 def process_directory(dir_path: str, source_type: str):
-    #with logfire.span("Scanning Directory", path=dir_path, source=source_type):
-    if 2>1:
+    # with logfire.span("Scanning Directory", path=dir_path, source=source_type):
+    if 2 > 1:
         files = [f for f in os.listdir(dir_path) if os.path.isfile(os.path.join(dir_path, f))]
         for filename in files:
             process_file(os.path.join(dir_path, filename), filename, source_type)
 
+
 def run_universal_ingestion(base_dir: str, explicit_source_type: str = None):
-    #with logfire.span("Universal Ingestion Started", base_directory=base_dir):
-    if 2>1:
+    # with logfire.span("Universal Ingestion Started", base_directory=base_dir):
+    if 2 > 1:
         subdirs = [d for d in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, d))]
         if not subdirs:
             source_type = explicit_source_type or "general"
@@ -150,6 +151,7 @@ def run_universal_ingestion(base_dir: str, explicit_source_type: str = None):
         else:
             for subdir in subdirs:
                 process_directory(os.path.join(base_dir, subdir), subdir)
+
 
 if __name__ == "__main__":
     clean_args = [a for a in sys.argv if a != "--wipe"]
@@ -160,5 +162,5 @@ if __name__ == "__main__":
         sys.exit(1)
 
     run_universal_ingestion(target_dir, explicit_source_type=explicit_type)
-    #logfire.info("Ingestion job completed.")
+    # logfire.info("Ingestion job completed.")
     print("Ingestion job completed.")
