@@ -24,6 +24,7 @@ def test_pinecone_search_retries_then_returns_empty():
         # Tenacity default: initial call + 2 retries = 3 attempts
         assert mock_index.query.call_count == 3
 
+
 def test_rerank_retries_then_falls_back():
     """Reranker should retry transient failures and fall back to input order."""
     docs = ["doc one", "doc two", "doc three"]
