@@ -13,14 +13,16 @@ def test_pinecone_search_retries_then_returns_empty():
         patch("app.services.retrieval.vectordb_service.embed_query") as mock_embed,
     ):
         mock_embed.return_value = [0.0] * 10
-        mock_client.query_points.side_effect = RuntimeError("transient")
+
+        mock_index = MagicMock()
+        mock_index.query.side_effect = RuntimeError("transient")
+        mock_client.Index.return_value = mock_index
 
         results = search_enterprise_knowledge("test query", limit=1)
 
         assert results == []
         # Tenacity default: initial call + 2 retries = 3 attempts
-        assert mock_client.query_points.call_count == 3
-
+        assert mock_index.query.call_count == 3
 
 def test_rerank_retries_then_falls_back():
     """Reranker should retry transient failures and fall back to input order."""

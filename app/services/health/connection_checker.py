@@ -20,6 +20,8 @@ from redis import Redis
 from app.config import settings
 from app.gateway.client import portkey_client
 
+client = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
+
 
 class ConnectionResult:
     """Result of a single connectivity check."""
@@ -88,7 +90,6 @@ def _check_upstash_redis() -> ConnectionResult:
 def _check_pinecone() -> ConnectionResult:
     """Verify Pinecone is reachable."""
     try:
-        client = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
         client.get_collections()
         return ConnectionResult("Pinecone", True, "Pinecone reachable")
     except Exception as e:
