@@ -19,6 +19,8 @@ from redis import Redis
 
 from app.config import settings
 from app.gateway.client import portkey_client
+
+
 class ConnectionResult:
     """Result of a single connectivity check."""
 
