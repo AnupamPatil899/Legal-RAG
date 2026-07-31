@@ -42,6 +42,14 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
+      - name: Debug variables
+        run: |
+          echo "REGION='${REGION}'"
+          echo "PROJECT_ID='${PROJECT_ID}'"
+          echo "REPOSITORY='${REPOSITORY}'"
+
+          echo "${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/rag-api:${GITHUB_SHA}"
+
       - name: Build & Push API
         uses: docker/build-push-action@v6
         with:
