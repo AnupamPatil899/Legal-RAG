@@ -66,13 +66,13 @@ def test_check_pinecone_success():
         result = _check_pinecone()
 
     assert result.healthy is True
-    assert result.name == "Pinecone"  # or change your production code to return "pinecone"
+    assert result.name == "pinecone"
     mock_client.list_indexes.assert_called_once()
 
 
 def test_check_pinecone_failure():
     mock_client = MagicMock()
-    mock_client.get_collections.side_effect = Exception("unauthorized")
+    mock_client.list_indexes.side_effect = Exception("unauthorized")
 
     with patch(
         "app.services.health.connection_checker.Pinecone",
@@ -81,6 +81,14 @@ def test_check_pinecone_failure():
         result = _check_pinecone()
 
     assert result.healthy is False
+    assert result.name == "pinecone"
+
+
+def test_check_pinecone_no_key():
+    with patch("app.services.health.connection_checker.settings.PINECONE_API_KEY", None), patch("os.getenv", return_value=None):
+        result = _check_pinecone()
+    assert result.healthy is False
+    assert "PINECONE_API_KEY not set" in result.message
 
 
 def test_check_portkey_gateway_success():

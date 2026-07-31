@@ -19,10 +19,6 @@ from redis import Redis
 
 from app.config import settings
 from app.gateway.client import portkey_client
-
-client = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
-
-
 class ConnectionResult:
     """Result of a single connectivity check."""
 
@@ -88,8 +84,12 @@ def _check_upstash_redis() -> ConnectionResult:
 
 
 def _check_pinecone() -> ConnectionResult:
+    api_key = settings.PINECONE_API_KEY or os.getenv("PINECONE_API_KEY")
+    if not api_key:
+        return ConnectionResult("pinecone", False, "PINECONE_API_KEY not set")
     try:
-        client.list_indexes()
+        pc = Pinecone(api_key=api_key)
+        pc.list_indexes()
         return ConnectionResult("pinecone", True, "Pinecone reachable")
     except Exception as e:
         logfire.warning(f"Pinecone health check failed: {e}")

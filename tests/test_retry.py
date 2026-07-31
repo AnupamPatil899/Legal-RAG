@@ -8,11 +8,14 @@ from app.services.retrieval.vectordb_service import search_enterprise_knowledge
 
 def test_pinecone_search_retries_then_returns_empty():
     """Pinecone search should retry transient failures and finally return []."""
+    mock_client = MagicMock()
     with (
-        patch("app.services.retrieval.vectordb_service.client") as mock_client,
+        patch("app.services.retrieval.vectordb_service.client", mock_client),
         patch("app.services.retrieval.vectordb_service.embed_query") as mock_embed,
+        patch("app.services.retrieval.vectordb_service.bm25") as mock_bm25,
     ):
         mock_embed.return_value = [0.0] * 10
+        mock_bm25.encode_queries.return_value = {"indices": [0], "values": [1.0]}
 
         mock_index = MagicMock()
         mock_index.query.side_effect = RuntimeError("transient")
