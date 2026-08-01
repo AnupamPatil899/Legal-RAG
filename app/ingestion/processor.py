@@ -11,7 +11,6 @@ logfire.configure()
 logfire.info("Hello, {place}!", place="World")
 
 
-
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -28,7 +27,6 @@ from app.ingestion.loaders.text import parse_text
 from app.services.retrieval.embedding import embed_texts, get_embedding_dim
 
 
-
 PROCESSED_DATA_DIR = "processed_data"
 
 # Initialize Pinecone Client
@@ -43,7 +41,9 @@ MASTER_INDEX_NAME = getattr(settings, "PINECONE_INDEX_NAME", "legal-enterprise-k
 
 
 # Load Metadata globally to avoid reading the file repeatedly
-METADATA_CSV_PATH = r"C:\Users\anupa\OneDrive\Desktop\Anupam\workshop\Advance_Rag_youtube\CUDA_Rag\DATA\master_clauses_updated_fi.csv"
+METADATA_CSV_PATH = (
+    r"C:\Users\anupa\OneDrive\Desktop\Anupam\workshop\Advance_Rag_youtube\CUDA_Rag\DATA\master_clauses_updated_fi.csv"
+)
 if os.path.exists(METADATA_CSV_PATH):
     df_meta = pd.read_csv(METADATA_CSV_PATH, encoding="Windows-1252").fillna("")
     METADATA_MAP = df_meta.set_index("Filename").to_dict(orient="index")

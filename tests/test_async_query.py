@@ -1,9 +1,10 @@
 """Tests for synchronous /query endpoint."""
 
 from unittest.mock import MagicMock, patch
-from app.config import settings
+
 from fastapi.testclient import TestClient
 
+from app.config import settings
 from app.main import app
 
 

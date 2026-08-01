@@ -3,6 +3,7 @@
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+
 from app.config import settings
 from app.main import app
 
