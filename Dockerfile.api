@@ -8,9 +8,12 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
 
 WORKDIR /app
 
-COPY pyproject.toml .
-RUN python3 -c "import tomllib,subprocess; deps=tomllib.load(open('pyproject.toml','rb'))['project']['dependencies']; subprocess.run(['uv','pip','install','--system','--no-cache']+deps,check=True)"
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
 
+ENV PATH="/app/.venv/bin:$PATH"
+    
 COPY app/ ./app/
 COPY ui/ ./ui/
 

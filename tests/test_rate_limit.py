@@ -13,8 +13,10 @@ from app.main import app
 def test_rate_limit_blocks_excessive_requests():
     """With a 1/minute limit, the second request within the window is rejected."""
     original_rate = settings.RATE_LIMIT_PER_MINUTE
+    original_key = settings.API_KEY
     try:
         settings.RATE_LIMIT_PER_MINUTE = 1
+        settings.API_KEY = None
         # Force an in-memory limiter for this test so state is isolated.
         app.state.limiter = Limiter(key_func=get_remote_address)
 
@@ -28,3 +30,4 @@ def test_rate_limit_blocks_excessive_requests():
         assert response2.status_code == 429
     finally:
         settings.RATE_LIMIT_PER_MINUTE = original_rate
+        settings.API_KEY = original_key

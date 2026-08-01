@@ -19,11 +19,17 @@ def initialize_rails() -> None:
 
     # guard_llm = ChatOpenAI(api_key=settings.PORTKEY_API_KEY,model=f"@{settings.PORTKEY_PRIMARY_SLUG}/llama-3.3-70b-versatile")
 
+    slug = settings.PORTKEY_PRIMARY_SLUG.strip()
+    api_key = settings.PORTKEY_API_KEY.strip()
+
     guard_llm = ChatOpenAI(
-        api_key=settings.PORTKEY_API_KEY,
+        api_key=api_key,
         base_url="https://api.portkey.ai/v1",  # Required: Redirects the request to Portkey
         model="llama-3.3-70b-versatile",  # Keep just the clean model name
-        default_headers={"x-portkey-virtual-key": settings.PORTKEY_PRIMARY_SLUG},
+        default_headers={
+            "x-portkey-api-key": api_key,
+            "x-portkey-virtual-key": slug,
+        },
     )
 
     config = RailsConfig.from_content(colang_content=COLANG_CONTENT, yaml_content=YAML_CONTENT)

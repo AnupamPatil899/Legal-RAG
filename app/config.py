@@ -65,12 +65,48 @@ class Settings(BaseSettings):
     LANGSMITH_PROJECT: str = "rag_scale_test"
     LANGSMITH_ENDPOINT: str = "https://api.smith.langchain.com"
 
+    @field_validator(
+        "JINA_API_KEY",
+        "OPENAI_API_KEY",
+        "JUDGE_OPENAI_API_KEY",
+        "PORTKEY_API_KEY",
+        "PORTKEY_PRIMARY_SLUG",
+        "PORTKEY_FALLBACK_SLUG",
+        "PORTKEY_PRIMARY_CONFIG_ID",
+        "QDRANT_URL",
+        "QDRANT_API_KEY",
+        "PINECONE_API_KEY",
+        "NEON_DB_URL",
+        "UPSTASH_REDIS_REST_URL",
+        "UPSTASH_REDIS_REST_TOKEN",
+        "API_KEY",
+        "LOGFIRE_TOKEN",
+        "LOGFIRE_BASE_URL",
+        "LANGSMITH_TRACING",
+        "LANGSMITH_API_KEY",
+        "LANGSMITH_PROJECT",
+        "LANGSMITH_ENDPOINT",
+        mode="before",
+    )
+    @classmethod
+    def _strip_whitespace(cls, v: str | None) -> str | None:
+        """Strip leading and trailing whitespace from string environment variables.
+
+        Prevents invalid HTTP header exceptions (e.g. h11/httpcore LocalProtocolError)
+        caused by trailing spaces in API keys or Portkey slugs (such as 'rag   ').
+        """
+        if isinstance(v, str):
+            return v.strip()
+        return v
+
     @field_validator("PINECONE_API_KEY", mode="before")
     @classmethod
     def _empty_pinecone_key_as_none(cls, v):
         """Treat empty PINECONE_API_KEY as unset so local Pinecone doesn't receive a blank header."""
         if v == "" or v is None:
             return None
+        if isinstance(v, str):
+            return v.strip()
         return v
 
     @property

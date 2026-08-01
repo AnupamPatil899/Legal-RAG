@@ -19,6 +19,8 @@ dependencies = [
     # --- VECTOR DB & RETRIEVAL ---
     "qdrant-client==1.17.1",
     "redis==7.4.0",
+    "pinecone==7.3.0",
+    "pinecone-text==0.11.0",
 
     # --- PRODUCTION PERSISTENCE & RELIABILITY ---
     "tenacity==9.1.2",

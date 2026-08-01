@@ -101,8 +101,9 @@ def _check_pinecone() -> ConnectionResult:
 def _check_portkey_gateway() -> ConnectionResult:
     """Verify Portkey LLM gateway responds to a minimal completion."""
     try:
+        slug = settings.PORTKEY_PRIMARY_SLUG.strip()
         resp = portkey_client.chat.completions.create(
-            model=f"@{settings.PORTKEY_PRIMARY_SLUG}/llama-3.3-70b-versatile",
+            model=f"@{slug}/llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": "Say hello in one word."}],
             max_completion_tokens=100,
             timeout=10,

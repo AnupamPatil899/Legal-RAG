@@ -14,17 +14,18 @@ from app.config import settings
 
 def _make_headers(feature: str = "rag") -> dict:
     """Build Portkey headers that reference the primary saved config by ID."""
-    if not settings.PORTKEY_PRIMARY_CONFIG_ID:
+    config_id = (settings.PORTKEY_PRIMARY_CONFIG_ID or "").strip()
+    if not config_id:
         raise ValueError(
             "PORTKEY_PRIMARY_CONFIG_ID is not set in .env. "
             "Get the real pc-... ID from the Portkey dashboard or "
             "run: PYTHONPATH=. python scripts/list_portkey_configs.py"
         )
     return createHeaders(
-        api_key=settings.PORTKEY_API_KEY,
-        config_id=settings.PORTKEY_PRIMARY_CONFIG_ID,
+        api_key=settings.PORTKEY_API_KEY.strip(),
+        config_id=config_id,
         metadata={
-            "feature": feature,
+            "feature": feature.strip(),
             "_user": "rag-system",
             "environment": "production",
         },
@@ -36,7 +37,7 @@ def _make_headers(feature: str = "rag") -> dict:
 # surface a first-class config_id constructor parameter; the header-based
 # approach works reliably with block_inline_config enabled.
 portkey_client = OpenAI(
-    api_key=settings.PORTKEY_API_KEY,
+    api_key=settings.PORTKEY_API_KEY.strip(),
     base_url=PORTKEY_GATEWAY_URL,
     default_headers=_make_headers(),
 )
@@ -52,10 +53,11 @@ def get_langchain_llm(feature: str = "rag") -> ChatOpenAI:
       auth + saved-config reference). The @slug/model-name format is Portkey-specific - the
       upstream provider's own client does not understand it. Portkey is just in the middle.
     """
+    slug = settings.PORTKEY_PRIMARY_SLUG.strip()
     return ChatOpenAI(
-        api_key=settings.PORTKEY_API_KEY,
+        api_key=settings.PORTKEY_API_KEY.strip(),
         base_url=PORTKEY_GATEWAY_URL,
-        model=f"@{settings.PORTKEY_PRIMARY_SLUG}/llama-3.3-70b-versatile",
+        model=f"@{slug}/llama-3.3-70b-versatile",
         default_headers=_make_headers(feature),
     )
 

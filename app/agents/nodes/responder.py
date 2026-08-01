@@ -95,7 +95,8 @@ def generate_node(state: AgentState):
 )
 def _generate_response(prompt: str):
     """Call the LLM gateway with retry logic for transient failures."""
+    slug = settings.PORTKEY_PRIMARY_SLUG.strip()
     return portkey_client.chat.completions.create(
-        model=f"@{settings.PORTKEY_PRIMARY_SLUG}/llama-3.3-70b-versatile",
+        model=f"@{slug}/llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}],
     )
