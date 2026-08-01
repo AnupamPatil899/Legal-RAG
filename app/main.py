@@ -6,7 +6,7 @@ import logfire
 
 from app.config import settings
 
-logfire.configure(send_to_logfire=False)
+logfire.configure()
 
 # Now safe to import app modules - logfire is already active
 import time
