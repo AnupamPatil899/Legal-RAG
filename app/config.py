@@ -43,6 +43,7 @@ class Settings(BaseSettings):
 
     # --- PINECONE VECTOR DB ---
     PINECONE_API_KEY: str | None = None
+    PINECONE_HOST: str | None = None
     PINECONE_COLLECTION: str = "legal_enterprise_rag"
 
     # --- NEON SERVERLESS POSTGRES (LangGraph checkpointer) ---
@@ -59,6 +60,7 @@ class Settings(BaseSettings):
 
     # --- OBSERVABILITY ---
     LOGFIRE_TOKEN: str | None = None
+    LOGFIRE_WRITE_TOKEN: str | None = None
     LOGFIRE_BASE_URL: str | None = None  # e.g. https://logfire-eu.pydantic.dev for EU tokens
     LANGSMITH_TRACING: str = "true"
     LANGSMITH_API_KEY: str | None = None
@@ -76,11 +78,13 @@ class Settings(BaseSettings):
         "QDRANT_URL",
         "QDRANT_API_KEY",
         "PINECONE_API_KEY",
+        "PINECONE_HOST",
         "NEON_DB_URL",
         "UPSTASH_REDIS_REST_URL",
         "UPSTASH_REDIS_REST_TOKEN",
         "API_KEY",
         "LOGFIRE_TOKEN",
+        "LOGFIRE_WRITE_TOKEN",
         "LOGFIRE_BASE_URL",
         "LANGSMITH_TRACING",
         "LANGSMITH_API_KEY",

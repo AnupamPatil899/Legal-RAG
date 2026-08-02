@@ -50,34 +50,22 @@ jobs:
 
           echo "${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/rag-api:${GITHUB_SHA}"
 
-      - name: Build & Push API
+      - name: Build & Push Image
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: Dockerfile.api
+          file: Dockerfile
           push: true
           tags: |
-            ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/rag-api:${{ github.sha }}
-            ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/rag-api:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build & Push UI
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: Dockerfile.ui
-          push: true
-          tags: |
-            ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/rag-ui:${{ github.sha }}
-            ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/rag-ui:latest
+            ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/rag-app:${{ github.sha }}
+            ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/rag-app:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Deploy API
         run: |
           gcloud run deploy "$API_SERVICE" \
-            --image="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/rag-api:${GITHUB_SHA}" \
+            --image="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/rag-app:${GITHUB_SHA}" \
             --region="$REGION" \
             --platform=managed \
             --service-account="$RUNTIME_SA" \
@@ -88,10 +76,12 @@ jobs:
       - name: Deploy UI
         run: |
           gcloud run deploy "$UI_SERVICE" \
-            --image="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/rag-ui:${GITHUB_SHA}" \
+            --image="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/rag-app:${GITHUB_SHA}" \
             --region="$REGION" \
             --platform=managed \
             --memory=2Gi \
             --service-account="$RUNTIME_SA" \
             --allow-unauthenticated \
+            --command="streamlit" \
+            --args="run,ui/app.py,--server.port,8080,--server.address,0.0.0.0" \
             --set-env-vars=BACKEND_URL=${BACKEND_URL},LOGFIRE_IGNORE_NO_CONFIG=1

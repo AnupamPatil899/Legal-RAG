@@ -1,4 +1,12 @@
 services:
+  pinecone-local:
+    image: ghcr.io/pinecone-io/pinecone-local:latest
+    ports:
+      - "5081-5090:5081-5090"
+    environment:
+      PORT: "5081"
+      PINECONE_HOST: "pinecone-local"
+
   qdrant:
     image: qdrant/qdrant:latest
     ports:
@@ -16,9 +24,8 @@ services:
     ports:
       - "8000:8080"
     environment:
-      # By default the app reads QDRANT_URL / QDRANT_API_KEY from the .env file.
-      # Set these explicitly here only when you want to override the .env values
-      # (e.g. to point at the local qdrant service above).
+      PINECONE_HOST: "http://pinecone-local:5081"
+      PINECONE_API_KEY: "pclocal"
       QDRANT_COLLECTION: enterprise_rag
       RATE_LIMIT_PER_MINUTE: "60"
       RAG_API_KEY: ""
@@ -26,6 +33,7 @@ services:
     env_file:
       - .env
     depends_on:
+      - pinecone-local
       - qdrant
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
 

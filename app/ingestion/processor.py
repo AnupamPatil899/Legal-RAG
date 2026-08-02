@@ -30,7 +30,19 @@ from app.services.retrieval.embedding import embed_texts, get_embedding_dim
 PROCESSED_DATA_DIR = "processed_data"
 
 # Initialize Pinecone Client
-pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
+_pinecone_api_key = getattr(settings, "PINECONE_API_KEY", None) or os.getenv("PINECONE_API_KEY")
+_pinecone_host = getattr(settings, "PINECONE_HOST", None) or os.getenv("PINECONE_HOST")
+
+if _pinecone_host and not _pinecone_api_key:
+    _pinecone_api_key = "pclocal"
+
+_pc_kwargs = {}
+if _pinecone_api_key:
+    _pc_kwargs["api_key"] = _pinecone_api_key
+if _pinecone_host:
+    _pc_kwargs["host"] = _pinecone_host
+
+pc = Pinecone(**_pc_kwargs)
 
 # Initialize BM25 Encoder for Hybrid Search (Sparse Vectors)
 bm25 = BM25Encoder.default()
@@ -55,12 +67,14 @@ else:
 # Ensure the master index exists ONCE at startup
 if MASTER_INDEX_NAME not in pc.list_indexes().names():
     dim = get_embedding_dim()
-    pc.create_index(
-        name=MASTER_INDEX_NAME,
-        dimension=dim,
-        metric="dotproduct",  # Required for Hybrid Search
-        spec=ServerlessSpec(cloud="aws", region="us-east-1"),
-    )
+    create_kwargs = {
+        "name": MASTER_INDEX_NAME,
+        "dimension": dim,
+        "metric": "dotproduct",  # Required for Hybrid Search
+    }
+    if not _pinecone_host:
+        create_kwargs["spec"] = ServerlessSpec(cloud="aws", region="us-east-1")
+    pc.create_index(**create_kwargs)
     logfire.info(f"Created new master Pinecone index: {MASTER_INDEX_NAME}")
     print(f"Created new master Pinecone index: {MASTER_INDEX_NAME}")
 

@@ -1,18 +1,27 @@
 import os
+import sys
 import time
 import uuid
+
+# Ensure project root is in sys.path when running via Streamlit CLI
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
 
 import logfire
 import requests
 import streamlit as st
 from dotenv import load_dotenv
 
-# Load environment variables explicitly from the root directory
-env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env"))
-load_dotenv(dotenv_path=env_path)
+from app.config import settings
+
+
+# # Load environment variables explicitly from the root directory
+# env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env"))
+# load_dotenv(dotenv_path=env_path)
 
 # # Initialize Logfire
-logfire.configure(token=os.getenv("LOGFIRE_WRITE_TOKEN"))
+logfire.configure(token=settings.LOGFIRE_WRITE_TOKEN)
 logfire.info("Streamlit startup")
 
 

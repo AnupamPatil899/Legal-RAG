@@ -4,15 +4,9 @@
 # ============================================================
 import logfire
 from dotenv import load_dotenv
-
 from app.config import settings
-
-load_dotenv("../.env", override=True)
 import os
 
-logfire.configure(token=os.getenv("LOGFIRE_WRITE_TOKEN"))
-logfire.info("Backend startup")
-# Now safe to import app modules - logfire is already active
 import time
 import uuid
 from typing import Optional
@@ -29,6 +23,14 @@ from app.guardrails import guard, initialize_rails
 from app.health import router as health_router
 from app.logging import set_request_id
 from app.services.health.connection_checker import check_all_connections, log_connection_summary
+
+# Load environment variables explicitly from the root directory
+env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env"))
+load_dotenv(dotenv_path=env_path)
+
+# # Initialize Logfire
+logfire.configure(token=os.getenv("LOGFIRE_WRITE_TOKEN"))
+logfire.info("Streamlit startup")
 
 # Custom Prometheus metrics
 RAG_REQUESTS_TOTAL = Counter(

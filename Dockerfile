@@ -21,6 +21,8 @@ RUN python3 -c "import tomllib,subprocess; deps=tomllib.load(open('pyproject.tom
 COPY app/ ./app/
 COPY ui/ ./ui/
 
+ENV PYTHONPATH="/app"
+
 # Expose the port documented in the task definitions and health checks.
 EXPOSE 8080
 

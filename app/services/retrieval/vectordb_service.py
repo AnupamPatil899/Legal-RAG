@@ -14,7 +14,18 @@ load_dotenv()
 
 # Initialize Pinecone Client & BM25 Encoder
 _pinecone_api_key = getattr(settings, "PINECONE_API_KEY", None) or os.getenv("PINECONE_API_KEY")
-client = Pinecone(api_key=_pinecone_api_key) if _pinecone_api_key else None
+_pinecone_host = getattr(settings, "PINECONE_HOST", None) or os.getenv("PINECONE_HOST")
+
+if _pinecone_host and not _pinecone_api_key:
+    _pinecone_api_key = "pclocal"
+
+_pc_kwargs = {}
+if _pinecone_api_key:
+    _pc_kwargs["api_key"] = _pinecone_api_key
+if _pinecone_host:
+    _pc_kwargs["host"] = _pinecone_host
+
+client = Pinecone(**_pc_kwargs) if (_pinecone_api_key or _pinecone_host) else None
 bm25 = BM25Encoder.default()
 
 MASTER_INDEX_NAME = getattr(settings, "PINECONE_INDEX_NAME", "legal-enterprise-knowledge-base")
@@ -29,7 +40,7 @@ MASTER_INDEX_NAME = getattr(settings, "PINECONE_INDEX_NAME", "legal-enterprise-k
 def _search_enterprise_knowledge(query: str, folder_name: str = None, limit: int = 8):
     """Internal hybrid search with retry logic and optional metadata filtering."""
     if client is None:
-        raise RuntimeError("PINECONE_API_KEY is not set")
+        raise RuntimeError("Neither PINECONE_API_KEY nor PINECONE_HOST is set")
 
     dense_vector = embed_query(query)
     sparse_vector = bm25.encode_queries(query)

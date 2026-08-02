@@ -87,11 +87,12 @@ def test_check_pinecone_failure():
 def test_check_pinecone_no_key():
     with (
         patch("app.services.health.connection_checker.settings.PINECONE_API_KEY", None),
+        patch("app.services.health.connection_checker.settings.PINECONE_HOST", None),
         patch("os.getenv", return_value=None),
     ):
         result = _check_pinecone()
     assert result.healthy is False
-    assert "PINECONE_API_KEY not set" in result.message
+    assert "Neither PINECONE_API_KEY nor PINECONE_HOST set" in result.message
 
 
 def test_check_portkey_gateway_success():

@@ -87,12 +87,23 @@ def _check_upstash_redis() -> ConnectionResult:
 
 def _check_pinecone() -> ConnectionResult:
     api_key = settings.PINECONE_API_KEY or os.getenv("PINECONE_API_KEY")
-    if not api_key:
-        return ConnectionResult("pinecone", False, "PINECONE_API_KEY not set")
+    host = settings.PINECONE_HOST or os.getenv("PINECONE_HOST")
+
+    if host and not api_key:
+        api_key = "pclocal"
+
+    if not api_key and not host:
+        return ConnectionResult("pinecone", False, "Neither PINECONE_API_KEY nor PINECONE_HOST set")
     try:
-        pc = Pinecone(api_key=api_key)
+        kwargs = {}
+        if api_key:
+            kwargs["api_key"] = api_key
+        if host:
+            kwargs["host"] = host
+        pc = Pinecone(**kwargs)
         pc.list_indexes()
-        return ConnectionResult("pinecone", True, "Pinecone reachable")
+        msg = f"Pinecone Local reachable ({host})" if host else "Pinecone reachable"
+        return ConnectionResult("pinecone", True, msg)
     except Exception as e:
         logfire.warning(f"Pinecone health check failed: {e}")
         return ConnectionResult("pinecone", False, str(e))
