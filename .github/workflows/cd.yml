@@ -84,4 +84,5 @@ jobs:
             --allow-unauthenticated \
             --command="streamlit" \
             --args="run,ui/app.py,--server.port,8080,--server.address,0.0.0.0" \
-            --set-env-vars=BACKEND_URL=${BACKEND_URL},LOGFIRE_IGNORE_NO_CONFIG=1
+            --set-env-vars=BACKEND_URL=${BACKEND_URL},LOGFIRE_IGNORE_NO_CONFIG=1 \
+            --set-secrets=LOGFIRE_TOKEN=LOGFIRE_TOKEN:latest
