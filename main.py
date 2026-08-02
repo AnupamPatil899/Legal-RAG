@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv("../.env", override=True)
 
-logfire.configure(token=os.getenv("LOGFIRE_WRITE_TOKEN"))
+logfire.configure(token=os.getenv("LOGFIRE_TOKEN"))
 logfire.info("Hello, {place}!", place="World")
 
 # {

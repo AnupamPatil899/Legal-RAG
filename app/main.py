@@ -27,9 +27,21 @@ from app.services.health.connection_checker import check_all_connections, log_co
 env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env"))
 load_dotenv(dotenv_path=env_path)
 
-# # Initialize Logfire
-logfire.configure(token=os.getenv("LOGFIRE_WRITE_TOKEN"))
-logfire.info("Streamlit startup")
+# Initialize Logfire
+logfire_token = getattr(settings, "LOGFIRE_WRITE_TOKEN", None) or settings.LOGFIRE_TOKEN
+logfire_base_url = settings.LOGFIRE_BASE_URL
+
+if logfire_token:
+    if not logfire_base_url and logfire_token.startswith("pylf_v2_eu_"):
+        logfire_base_url = "https://logfire-eu.pydantic.dev"
+    logfire_kwargs = {"token": logfire_token}
+    if logfire_base_url:
+        logfire_kwargs["base_url"] = logfire_base_url
+    logfire.configure(**logfire_kwargs)
+    logfire.info("API backend startup")
+else:
+    logfire.configure(send_to_logfire=False)
+
 
 # Custom Prometheus metrics
 RAG_REQUESTS_TOTAL = Counter(
