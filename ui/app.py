@@ -25,7 +25,7 @@ if logfire_token:
 
     logfire_kwargs = {"token": logfire_token}
     if logfire_base_url:
-        logfire_kwargs["base_url"] = logfire_base_url
+        logfire_kwargs["advanced"] = logfire.AdvancedOptions(base_url=logfire_base_url)
 
     logfire.configure(**logfire_kwargs)
     logfire.info("Streamlit startup")

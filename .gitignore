@@ -61,3 +61,5 @@ tenvv
 
 # Redis local dump
 dump.rdb
+
+main.py

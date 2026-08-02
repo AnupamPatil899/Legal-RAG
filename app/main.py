@@ -32,11 +32,15 @@ logfire_token = getattr(settings, "LOGFIRE_WRITE_TOKEN", None) or settings.LOGFI
 logfire_base_url = settings.LOGFIRE_BASE_URL
 
 if logfire_token:
+    # Only set base_url if explicitly set or if an EU v2 token is detected.
+    # US tokens (pylf_v1_us_) automatically use default Logfire US API ingestion.
     if not logfire_base_url and logfire_token.startswith("pylf_v2_eu_"):
         logfire_base_url = "https://logfire-eu.pydantic.dev"
+
     logfire_kwargs = {"token": logfire_token}
     if logfire_base_url:
-        logfire_kwargs["base_url"] = logfire_base_url
+        logfire_kwargs["advanced"] = logfire.AdvancedOptions(base_url=logfire_base_url)
+
     logfire.configure(**logfire_kwargs)
     logfire.info("API backend startup")
 else:

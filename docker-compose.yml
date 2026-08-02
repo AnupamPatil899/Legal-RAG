@@ -7,16 +7,6 @@ services:
       PORT: "5081"
       PINECONE_HOST: "pinecone-local"
 
-  qdrant:
-    image: qdrant/qdrant:latest
-    ports:
-      - "6333:6333"
-      - "6334:6334"
-    volumes:
-      - qdrant-data:/qdrant/storage
-    environment:
-      QDRANT__SERVICE__GRPC_PORT: 6334
-
   api:
     build:
       context: .
@@ -34,8 +24,7 @@ services:
       - .env
     depends_on:
       - pinecone-local
-      - qdrant
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+    command: [ "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080" ]
 
   ui:
     build:
@@ -52,7 +41,4 @@ services:
       - ./ui:/app/ui:ro
     depends_on:
       - api
-    command: ["streamlit", "run", "ui/app.py", "--server.port", "8501", "--server.address", "0.0.0.0"]
-
-volumes:
-  qdrant-data:
+    command: [ "streamlit", "run", "ui/app.py", "--server.port", "8501", "--server.address", "0.0.0.0" ]

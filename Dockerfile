@@ -10,18 +10,18 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
 
 WORKDIR /app
 
-# Layer: install dependencies only (cached until pyproject.toml changes).
-# tomllib (stdlib in 3.11+) extracts [project.dependencies] so we can
-# install deps without copying source — preserves cache on code-only changes.
-# uv prefers binary wheels by default (no --prefer-binary flag needed).
-COPY pyproject.toml .
-RUN python3 -c "import tomllib,subprocess; deps=tomllib.load(open('pyproject.toml','rb'))['project']['dependencies']; subprocess.run(['uv','pip','install','--system','--no-cache']+deps,check=True)"
+# Layer: install dependencies only with BuildKit cache mount.
+# Fully cached unless pyproject.toml or uv.lock change!
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
+
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH="/app"
 
 # Layer: copy source — only invalidates on code changes, not dep changes.
 COPY app/ ./app/
 COPY ui/ ./ui/
-
-ENV PYTHONPATH="/app"
 
 # Expose the port documented in the task definitions and health checks.
 EXPOSE 8080
