@@ -41,4 +41,4 @@ services:
       - ./ui:/app/ui:ro
     depends_on:
       - api
-    command: [ "streamlit", "run", "ui/app.py", "--server.port", "8501", "--server.address", "0.0.0.0" ]
+    command: [ "streamlit", "run", "ui/dashboard.py", "--server.port", "8501", "--server.address", "0.0.0.0" ]

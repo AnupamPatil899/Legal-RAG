@@ -102,7 +102,7 @@ ignore = ["E501"]
 # Import order is intentionally deferred so logfire/dotenv are configured first.
 "app/main.py" = ["E402"]
 "app/ingestion/processor.py" = ["E402", "I001"]
-"ui/app.py" = ["E402", "I001"]
+"ui/dashboard.py" = ["E402", "I001"]
 "evals/app.py" = ["E402"]
 "evals/run_evals.py" = ["E402"]
 "evals/metrics.py" = ["E402"]

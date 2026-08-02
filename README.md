@@ -156,7 +156,7 @@ The `/query` endpoint runs the LangGraph pipeline synchronously. You only need t
 uvicorn app.main:app --reload --port 8000
 
 # Terminal 2 — Streamlit UI
-streamlit run ui/app.py
+streamlit run ui/dashboard.py
 ```
 
 ### 5. Query the API
