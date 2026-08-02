@@ -3,11 +3,15 @@
 # so that spans from all modules are captured from the start.
 # ============================================================
 import logfire
+from dotenv import load_dotenv
 
 from app.config import settings
 
-logfire.configure()
+load_dotenv("../.env", override=True)
+import os
 
+logfire.configure(token=os.getenv("LOGFIRE_WRITE_TOKEN"))
+logfire.info("Backend startup")
 # Now safe to import app modules - logfire is already active
 import time
 import uuid

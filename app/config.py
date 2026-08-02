@@ -30,8 +30,8 @@ class Settings(BaseSettings):
 
     # --- PORTKEY LLM GATEWAY ---
     PORTKEY_API_KEY: str
-    PORTKEY_PRIMARY_SLUG: str = "marathon-api"
-    PORTKEY_FALLBACK_SLUG: str = "anthropic-fallback"
+    PORTKEY_PRIMARY_SLUG: str = "rag"
+    PORTKEY_FALLBACK_SLUG: str = "brag"
     # Portkey saved config is referenced by its system-generated `pc-...` ID.
     # Required when block_inline_config is enabled on the workspace.
     PORTKEY_PRIMARY_CONFIG_ID: str

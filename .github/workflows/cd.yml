@@ -81,6 +81,7 @@ jobs:
             --region="$REGION" \
             --platform=managed \
             --service-account="$RUNTIME_SA" \
+            --memory=2Gi \
             --allow-unauthenticated \
             --set-secrets=OPENAI_API_KEY=OPENAI_API_KEY:latest,JINA_API_KEY=JINA_API_KEY:latest,PORTKEY_API_KEY=PORTKEY_API_KEY:latest,PORTKEY_PRIMARY_CONFIG_ID=PORTKEY_PRIMARY_CONFIG_ID:latest,NEON_DB_URL=NEON_DB_URL:latest,QDRANT_URL=QDRANT_URL:latest,QDRANT_API_KEY=QDRANT_API_KEY:latest,UPSTASH_REDIS_REST_URL=UPSTASH_REDIS_REST_URL:latest,UPSTASH_REDIS_REST_TOKEN=UPSTASH_REDIS_REST_TOKEN:latest,RAG_API_KEY=RAG_API_KEY:latest,LOGFIRE_TOKEN=LOGFIRE_TOKEN:latest,LANGSMITH_API_KEY=LANGSMITH_API_KEY:latest
 
@@ -90,6 +91,7 @@ jobs:
             --image="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/rag-ui:${GITHUB_SHA}" \
             --region="$REGION" \
             --platform=managed \
+            --memory=2Gi \
             --service-account="$RUNTIME_SA" \
             --allow-unauthenticated \
             --set-env-vars=BACKEND_URL=${BACKEND_URL},LOGFIRE_IGNORE_NO_CONFIG=1

@@ -5,14 +5,24 @@ import uuid
 import logfire
 import requests
 import streamlit as st
+from dotenv import load_dotenv
 
-# Initialize Logfire
-try:
-    logfire.configure(token=st.secrets.get("LOGFIRE_TOKEN", os.getenv("LOGFIRE_TOKEN")))
-    logfire.instrument_requests()  # propagates trace context to the FastAPI backend
-    LOGFIRE_STATUS = "Connected & Tracing"
-except Exception:
-    LOGFIRE_STATUS = "Standby (No Token)"
+# Load environment variables explicitly from the root directory
+env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env"))
+load_dotenv(dotenv_path=env_path)
+
+logfire.configure(token=os.getenv("LOGFIRE_WRITE_TOKEN"))
+logfire.info("Streamlit startup 2")
+
+
+# # Initialize Logfire
+# try:
+#     logfire.configure(token=st.secrets.get("LOGFIRE_TOKEN", os.getenv("LOGFIRE_TOKEN")))
+#     logfire.instrument_requests()  # propagates trace context to the FastAPI backend
+#     LOGFIRE_STATUS = "Connected & Tracing"
+# except Exception:
+#     LOGFIRE_STATUS = "Standby (No Token)"
+
 
 # --- PAGE CONFIG ---
 st.set_page_config(
@@ -41,7 +51,7 @@ with st.sidebar:
     base_url = "http://localhost:8000"
 
     st.markdown("---")
-    st.success(f"Logfire: {LOGFIRE_STATUS}")
+    st.success("Logfire: Start")
     st.info(f"Memory ID: {st.session_state.session_id[:8]}")
 
     if st.button("🗑️ Clear History & Memory", width="stretch", type="primary"):
