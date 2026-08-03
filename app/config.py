@@ -22,22 +22,22 @@ class Settings(BaseSettings):
     )
 
     # --- JINA AI (embeddings + reranker) ---
-    JINA_API_KEY: str
+    JINA_API_KEY: str | None = None
 
     # --- OPENAI LLM ---
-    OPENAI_API_KEY: str
+    OPENAI_API_KEY: str | None = None
     JUDGE_OPENAI_API_KEY: str | None = None
 
     # --- PORTKEY LLM GATEWAY ---
-    PORTKEY_API_KEY: str
+    PORTKEY_API_KEY: str | None = None
     PORTKEY_PRIMARY_SLUG: str = "rag"
     PORTKEY_FALLBACK_SLUG: str = "brag"
     # Portkey saved config is referenced by its system-generated `pc-...` ID.
     # Required when block_inline_config is enabled on the workspace.
-    PORTKEY_PRIMARY_CONFIG_ID: str
+    PORTKEY_PRIMARY_CONFIG_ID: str | None = None
 
     # --- QDRANT VECTOR DB ---
-    QDRANT_URL: str = Field(validation_alias=AliasChoices("QDRANT_URL", "QDRANT_CLUSTER_ENDPOINT"))
+    QDRANT_URL: str | None = Field(default=None, validation_alias=AliasChoices("QDRANT_URL", "QDRANT_CLUSTER_ENDPOINT"))
     QDRANT_API_KEY: str | None = None
     QDRANT_COLLECTION: str = "enterprise_rag"
 
@@ -47,11 +47,11 @@ class Settings(BaseSettings):
     PINECONE_COLLECTION: str = "legal_enterprise_rag"
 
     # --- NEON SERVERLESS POSTGRES (LangGraph checkpointer) ---
-    NEON_DB_URL: str
+    NEON_DB_URL: str | None = None
 
     # --- UPSTASH REDIS (rate limiting) ---
-    UPSTASH_REDIS_REST_URL: str
-    UPSTASH_REDIS_REST_TOKEN: str
+    UPSTASH_REDIS_REST_URL: str | None = None
+    UPSTASH_REDIS_REST_TOKEN: str | None = None
 
     # --- API SAFETY ---
     API_KEY: str | None = Field(default=None, alias="RAG_API_KEY")
@@ -114,7 +114,7 @@ class Settings(BaseSettings):
         return v
 
     @property
-    def judge_api_key(self) -> str:
+    def judge_api_key(self) -> str | None:
         """Dedicated judge key, falling back to the main OpenAI key."""
         return self.JUDGE_OPENAI_API_KEY or self.OPENAI_API_KEY
 
@@ -125,6 +125,8 @@ class Settings(BaseSettings):
         Serverless Postgres closes idle connections, so append TCP keepalive
         options to keep the connection pool healthy between requests.
         """
+        if not self.NEON_DB_URL:
+            return ""
         base = self.NEON_DB_URL.rstrip("/")
         keepalive = "keepalives=1&keepalives_idle=30&keepalives_interval=10&keepalives_count=5"
         if "?" in base:
@@ -139,7 +141,9 @@ class Settings(BaseSettings):
         used as the Redis password under the default username. The result is
         passed to `limits` for rate limiting and to the health checker.
         """
-        host = self.UPSTASH_REDIS_REST_URL.replace("https://", "").rstrip("/")
+        if not self.UPSTASH_REDIS_REST_URL or not self.UPSTASH_REDIS_REST_TOKEN:
+            return ""
+        host = self.UPSTASH_REDIS_REST_URL.replace("https://", "").replace("http://", "").rstrip("/")
         token = quote(self.UPSTASH_REDIS_REST_TOKEN, safe="")
         netloc = f"default:{token}@{host}"
         return urlunsplit(("rediss", netloc, "/0", "ssl_cert_reqs=required", ""))

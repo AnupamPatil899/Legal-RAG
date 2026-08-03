@@ -12,12 +12,9 @@ import logfire
 import requests
 import streamlit as st
 
-from app.config import settings
-
-
 # Initialize Logfire
-logfire_token = getattr(settings, "LOGFIRE_WRITE_TOKEN", None) or settings.LOGFIRE_TOKEN
-logfire_base_url = settings.LOGFIRE_BASE_URL
+logfire_token = os.getenv("LOGFIRE_WRITE_TOKEN") or os.getenv("LOGFIRE_TOKEN")
+logfire_base_url = os.getenv("LOGFIRE_BASE_URL")
 
 if logfire_token:
     if not logfire_base_url and logfire_token.startswith("pylf_v2_eu_"):

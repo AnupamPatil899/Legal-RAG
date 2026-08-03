@@ -38,6 +38,8 @@ class ConnectionResult:
 
 def _check_neon_postgres() -> ConnectionResult:
     """Verify Neon Postgres is reachable and accepts queries."""
+    if not settings.postgres_uri:
+        return ConnectionResult("postgres", False, "NEON_DB_URL not configured")
     pool = None
     conn = None
     try:
@@ -72,6 +74,8 @@ def _check_neon_postgres() -> ConnectionResult:
 
 def _check_upstash_redis() -> ConnectionResult:
     """Verify Upstash Redis is reachable."""
+    if not settings.redis_url:
+        return ConnectionResult("redis", False, "UPSTASH_REDIS_REST_URL/TOKEN not configured")
     try:
         r = Redis.from_url(
             settings.redis_url,
@@ -101,8 +105,14 @@ def _check_pinecone() -> ConnectionResult:
         if host:
             kwargs["host"] = host
         pc = Pinecone(**kwargs)
-        pc.list_indexes()
-        msg = f"Pinecone Local reachable ({host})" if host else "Pinecone reachable"
+        if host:
+            collection = getattr(settings, "PINECONE_COLLECTION", "legal_enterprise_rag")
+            index = pc.Index(collection)
+            index.describe_index_stats()
+            msg = f"Pinecone Local reachable ({host})"
+        else:
+            pc.list_indexes()
+            msg = "Pinecone reachable"
         return ConnectionResult("pinecone", True, msg)
     except Exception as e:
         logfire.warning(f"Pinecone health check failed: {e}")
@@ -111,6 +121,8 @@ def _check_pinecone() -> ConnectionResult:
 
 def _check_portkey_gateway() -> ConnectionResult:
     """Verify Portkey LLM gateway responds to a minimal completion."""
+    if not settings.PORTKEY_API_KEY:
+        return ConnectionResult("llm_gateway", False, "PORTKEY_API_KEY not configured")
     try:
         slug = settings.PORTKEY_PRIMARY_SLUG.strip()
         resp = portkey_client.chat.completions.create(

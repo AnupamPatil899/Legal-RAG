@@ -70,6 +70,23 @@ def test_check_pinecone_success():
     mock_client.list_indexes.assert_called_once()
 
 
+def test_check_pinecone_local_success():
+    mock_client = MagicMock()
+    mock_index = MagicMock()
+    mock_client.Index.return_value = mock_index
+
+    with (
+        patch("app.services.health.connection_checker.settings.PINECONE_HOST", "http://localhost:5081"),
+        patch("app.services.health.connection_checker.Pinecone", return_value=mock_client),
+    ):
+        result = _check_pinecone()
+
+    assert result.healthy is True
+    assert result.name == "pinecone"
+    assert "Pinecone Local reachable" in result.message
+    mock_index.describe_index_stats.assert_called_once()
+
+
 def test_check_pinecone_failure():
     mock_client = MagicMock()
     mock_client.list_indexes.side_effect = Exception("unauthorized")
