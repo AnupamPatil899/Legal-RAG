@@ -8,6 +8,22 @@ from pinecone import Pinecone
 from pinecone_text.sparse import BM25Encoder
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+# Patch Pinecone's check_realistic_host to support custom/docker hostnames (e.g. 'pinecone-local') without dots
+try:
+    import pinecone.pinecone as _pinecone_mod
+
+    _pinecone_mod.check_realistic_host = lambda host: None
+except (ImportError, AttributeError):
+    pass
+
+try:
+    import pinecone.pinecone_asyncio as _pinecone_async_mod
+
+    _pinecone_async_mod.check_realistic_host = lambda host: None
+except (ImportError, AttributeError):
+    pass
+
+
 from app.config import settings
 from app.services.retrieval.embedding import embed_query
 

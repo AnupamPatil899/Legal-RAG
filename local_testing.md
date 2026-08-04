@@ -52,8 +52,10 @@ Required variables in `.env`:
 | `PORTKEY_PRIMARY_SLUG` | Human-readable name of your primary Portkey config | Portkey dashboard |
 | `PORTKEY_FALLBACK_SLUG` | Human-readable name of your fallback Portkey provider in Portkey Model Catalog | Portkey dashboard |
 | `PORTKEY_PRIMARY_CONFIG_ID` | System-generated `pc-...` ID of the single saved config that contains primary + fallback targets | Portkey dashboard or `scripts/list_portkey_configs.py` |
-| `QDRANT_CLUSTER_ENDPOINT` | Qdrant URL | Qdrant Cloud |
-| `QDRANT_API_KEY` | Qdrant API key | Qdrant Cloud |
+| `PORTKEY_PRIMARY_CONFIG_ID` | System-generated `pc-...` ID of the single saved config that contains primary + fallback targets | Portkey dashboard or `scripts/list_portkey_configs.py` |
+| `PINECONE_API_KEY` | Pinecone API Key (for Cloud mode) | Pinecone dashboard |
+| `PINECONE_HOST` | Pinecone Host URL (for Docker local mode, e.g. `http://localhost:5081`) | Local docker-compose |
+| `PINECONE_INDEX_NAME` | Name of Pinecone Index (default: `legal-enterprise-knowledge-base`) | Config |
 | `NEON_DB_URL` | Postgres URL for LangGraph checkpointer | Neon dashboard |
 | `UPSTASH_REDIS_REST_URL` | Upstash Redis REST URL | Upstash dashboard |
 | `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis REST token | Upstash dashboard |
@@ -88,7 +90,7 @@ Expected output:
 ```text
 OK   postgres             Neon Postgres reachable
 OK   redis                Upstash Redis reachable
-OK   qdrant               Qdrant reachable
+OK   pinecone             Pinecone Local reachable (http://localhost:5081)
 OK   llm_gateway          Portkey gateway reachable
 OK   jina_embeddings      Jina Embeddings API reachable
 OK   jina_reranker        Jina Reranker API reachable
@@ -106,7 +108,6 @@ The application runs as a single FastAPI process. The RAG pipeline is executed s
 ### 2.1 Start the FastAPI server
 
 ```bash
-cd /Users/sourangshupal/Downloads/8hr-MARATHON
 source .venv/bin/activate
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
@@ -131,11 +132,21 @@ curl http://localhost:8000/ready | python -m json.tool
 
 ---
 
-## 3. Data Ingestion
+## 3. Data Ingestion & Pinecone Index Setup
 
-Ingestion reads files from a local directory, chunks them, embeds them, and indexes them in Qdrant.
+Ingestion reads files from a local directory, chunks them, embeds them, and indexes them in Pinecone.
 
-### 3.1 Full ingestion (wipes existing collection)
+### 3.0 Initialize Pinecone Index
+
+```bash
+# If using local Docker container
+docker compose up -d pinecone-local
+
+# Create index
+python scripts/create_pinecone_index.py
+```
+
+### 3.1 Full ingestion (wipes existing index)
 
 ```bash
 source .venv/bin/activate
@@ -143,7 +154,7 @@ python -m app.ingestion.processor DATA --wipe
 ```
 
 - `DATA` is the root folder containing `true_data/` and `noisy_data/`.
-- `--wipe` drops the existing Qdrant collection and recreates it with the correct 1024-dimensional cosine index.
+- `--wipe` drops the existing Pinecone index and recreates it with the correct 1024-dimensional hybrid dotproduct index.
 
 ### 3.2 Ingest a single folder
 
@@ -154,14 +165,12 @@ python -m app.ingestion.processor DATA/noisy_data noisy
 
 ### 3.3 Verify ingestion
 
-Check the Qdrant collection count:
+Run the health connection checker or inspect index stats:
 
 ```bash
-curl -s "${QDRANT_CLUSTER_ENDPOINT}/collections/enterprise_rag" \
-  -H "api-key: ${QDRANT_API_KEY}" | python -m json.tool
+python -m app.services.health.connection_checker
 ```
 
-Or use the Qdrant dashboard.
 
 ---
 
