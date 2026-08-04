@@ -59,9 +59,9 @@ def test_check_upstash_redis_failure():
 def test_check_pinecone_success():
     mock_client = MagicMock()
 
-    with patch(
-        "app.services.health.connection_checker.Pinecone",
-        return_value=mock_client,
+    with (
+        patch("app.services.health.connection_checker.settings.PINECONE_HOST", None),
+        patch("app.services.health.connection_checker.Pinecone", return_value=mock_client),
     ):
         result = _check_pinecone()
 
@@ -90,6 +90,9 @@ def test_check_pinecone_local_success():
 def test_check_pinecone_failure():
     mock_client = MagicMock()
     mock_client.list_indexes.side_effect = Exception("unauthorized")
+    mock_index = MagicMock()
+    mock_index.describe_index_stats.side_effect = Exception("unauthorized")
+    mock_client.Index.return_value = mock_index
 
     with patch(
         "app.services.health.connection_checker.Pinecone",
@@ -105,7 +108,7 @@ def test_check_pinecone_no_key():
     with (
         patch("app.services.health.connection_checker.settings.PINECONE_API_KEY", None),
         patch("app.services.health.connection_checker.settings.PINECONE_HOST", None),
-        patch("os.getenv", return_value=None),
+        patch("os.getenv", side_effect=lambda k, d=None: None),
     ):
         result = _check_pinecone()
     assert result.healthy is False

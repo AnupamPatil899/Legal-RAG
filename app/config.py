@@ -43,7 +43,7 @@ class Settings(BaseSettings):
 
     # --- PINECONE VECTOR DB ---
     PINECONE_API_KEY: str | None = Field(default=None, validation_alias=AliasChoices("PINECONE_API_KEY"))
-    PINECONE_HOST: str | None = Field(default="http://localhost:5081", validation_alias=AliasChoices("PINECONE_HOST"))
+    PINECONE_HOST: str | None = Field(default=None, validation_alias=AliasChoices("PINECONE_HOST"))
     PINECONE_INDEX_NAME: str = Field(
         default="legal-enterprise-knowledge-base",
         validation_alias=AliasChoices("PINECONE_INDEX_NAME", "PINECONE_COLLECTION"),
@@ -110,9 +110,9 @@ class Settings(BaseSettings):
     @field_validator("PINECONE_API_KEY", mode="before")
     @classmethod
     def _empty_pinecone_key_as_none(cls, v):
-        """Treat empty PINECONE_API_KEY as 'pclocal' for local container access."""
+        """Treat empty PINECONE_API_KEY as unset so local Pinecone doesn't receive a blank header."""
         if v == "" or v is None:
-            return "pclocal"
+            return None
         if isinstance(v, str):
             return v.strip()
         return v
