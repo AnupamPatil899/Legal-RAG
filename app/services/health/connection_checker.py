@@ -90,26 +90,23 @@ def _check_upstash_redis() -> ConnectionResult:
 
 
 def _check_pinecone() -> ConnectionResult:
-    api_key = settings.PINECONE_API_KEY or os.getenv("PINECONE_API_KEY")
+    api_key = settings.PINECONE_API_KEY or os.getenv("PINECONE_API_KEY") or "pclocal"
     host = settings.PINECONE_HOST or os.getenv("PINECONE_HOST")
-
-    if host and not api_key:
-        api_key = "pclocal"
 
     if not api_key and not host:
         return ConnectionResult("pinecone", False, "Neither PINECONE_API_KEY nor PINECONE_HOST set")
     try:
-        kwargs = {}
-        if api_key:
-            kwargs["api_key"] = api_key
+        from app.services.retrieval.vectordb_service import get_pinecone_index
+
+        kwargs = {"api_key": api_key}
         if host:
             kwargs["host"] = host
         pc = Pinecone(**kwargs)
-        if host:
-            collection = getattr(settings, "PINECONE_COLLECTION", "legal_enterprise_rag")
-            index = pc.Index(collection)
-            index.describe_index_stats()
-            msg = f"Pinecone Local reachable ({host})"
+        collection = getattr(settings, "PINECONE_INDEX_NAME", "legal-enterprise-knowledge-base")
+        index = get_pinecone_index(pc, collection)
+        if index:
+            stats = index.describe_index_stats()
+            msg = f"Pinecone Local reachable ({host}, vectors={stats.get('total_vector_count', 0)})"
         else:
             pc.list_indexes()
             msg = "Pinecone reachable"

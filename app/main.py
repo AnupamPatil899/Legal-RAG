@@ -32,6 +32,7 @@ logfire_token = getattr(settings, "LOGFIRE_WRITE_TOKEN", None) or settings.LOGFI
 logfire_base_url = settings.LOGFIRE_BASE_URL
 
 if logfire_token:
+    os.environ["LOGFIRE_TOKEN"] = logfire_token
     # Only set base_url if explicitly set or if an EU v2 token is detected.
     # US tokens (pylf_v1_us_) automatically use default Logfire US API ingestion.
     if not logfire_base_url and logfire_token.startswith("pylf_v2_eu_"):
@@ -168,6 +169,10 @@ def rate_limit(times: int = None, seconds: int = None):
 # Initialize FastAPI
 app = FastAPI(title="Enterprise Agentic RAG API")
 app.include_router(health_router)
+
+# Instrument FastAPI and HTTP requests with Logfire
+logfire.instrument_fastapi(app)
+logfire.instrument_requests()
 
 # Expose Prometheus metrics at /metrics with default request instrumentation.
 Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)

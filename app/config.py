@@ -42,9 +42,13 @@ class Settings(BaseSettings):
     QDRANT_COLLECTION: str = "enterprise_rag"
 
     # --- PINECONE VECTOR DB ---
-    PINECONE_API_KEY: str | None = None
-    PINECONE_HOST: str | None = None
-    PINECONE_COLLECTION: str = "legal_enterprise_rag"
+    PINECONE_API_KEY: str | None = Field(default=None, validation_alias=AliasChoices("PINECONE_API_KEY"))
+    PINECONE_HOST: str | None = Field(default="http://localhost:5081", validation_alias=AliasChoices("PINECONE_HOST"))
+    PINECONE_INDEX_NAME: str = Field(
+        default="legal-enterprise-knowledge-base",
+        validation_alias=AliasChoices("PINECONE_INDEX_NAME", "PINECONE_COLLECTION"),
+    )
+    PINECONE_COLLECTION: str = "legal-enterprise-knowledge-base"
 
     # --- NEON SERVERLESS POSTGRES (LangGraph checkpointer) ---
     NEON_DB_URL: str | None = None
@@ -61,7 +65,7 @@ class Settings(BaseSettings):
     # --- OBSERVABILITY ---
     LOGFIRE_TOKEN: str | None = None
     LOGFIRE_WRITE_TOKEN: str | None = None
-    LOGFIRE_BASE_URL: str | None = None  # e.g. https://logfire-eu.pydantic.dev for EU tokens
+    LOGFIRE_BASE_URL: str | None = "https://logfire-us.pydantic.dev"  # Default US Logfire API endpoint
     LANGSMITH_TRACING: str = "true"
     LANGSMITH_API_KEY: str | None = None
     LANGSMITH_PROJECT: str = "rag_scale_test"
@@ -106,9 +110,9 @@ class Settings(BaseSettings):
     @field_validator("PINECONE_API_KEY", mode="before")
     @classmethod
     def _empty_pinecone_key_as_none(cls, v):
-        """Treat empty PINECONE_API_KEY as unset so local Pinecone doesn't receive a blank header."""
+        """Treat empty PINECONE_API_KEY as 'pclocal' for local container access."""
         if v == "" or v is None:
-            return None
+            return "pclocal"
         if isinstance(v, str):
             return v.strip()
         return v

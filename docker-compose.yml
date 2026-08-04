@@ -6,6 +6,8 @@ services:
     environment:
       PORT: "5081"
       PINECONE_HOST: "pinecone-local"
+    volumes:
+      - pinecone_data:/data
 
   api:
     build:
@@ -42,3 +44,24 @@ services:
     depends_on:
       - api
     command: [ "streamlit", "run", "ui/dashboard.py", "--server.port", "8501", "--server.address", "0.0.0.0" ]
+
+  ingest:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      PINECONE_HOST: "http://pinecone-local:5081"
+      PINECONE_API_KEY: "pclocal"
+    env_file:
+      - .env
+    volumes:
+      - ./DATA:/app/DATA
+      - ./processed_data:/app/processed_data
+    depends_on:
+      - pinecone-local
+    command: [ "python", "-m", "app.ingestion.processor", "DATA" ]
+    profiles:
+      - ingest
+
+volumes:
+  pinecone_data:
