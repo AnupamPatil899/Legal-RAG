@@ -2,6 +2,14 @@
 
 A production-grade, enterprise-level RAG system built with **LangGraph**, **Portkey LLM Gateway**, **OpenAI**, **Qdrant Vector Database**, and **Jina AI Embeddings/Reranker**. The system distinguishes between technical "True Data" and random "Noisy Data" using semantic re-ranking, history-aware planning, and NeMo Guardrails for input/output safety.
 
+## 🚀 Live Demo & API Endpoints
+
+- **Frontend Streamlit UI**: [https://rag-ui-976087180091.asia-south1.run.app/](https://rag-ui-976087180091.asia-south1.run.app/)
+- **Backend FastAPI Service**: [https://rag-api-976087180091.asia-south1.run.app/](https://rag-api-976087180091.asia-south1.run.app/)
+
+
+---
+
 ## Key Features
 
 - **Agentic Intelligence**: LangGraph for cyclic reasoning, multi-step planning, and conversation memory.
