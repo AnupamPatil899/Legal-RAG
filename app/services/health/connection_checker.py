@@ -89,6 +89,31 @@ def _check_upstash_redis() -> ConnectionResult:
         return ConnectionResult("redis", False, str(e))
 
 
+def _check_qdrant() -> ConnectionResult:
+    """Verify Qdrant Vector DB is reachable."""
+    from app.services.retrieval.vectordb_service import get_qdrant_client
+
+    url = getattr(settings, "QDRANT_URL", None) or os.getenv("QDRANT_URL")
+    if not url:
+        return ConnectionResult("qdrant", False, "QDRANT_URL not configured")
+    try:
+        client = get_qdrant_client()
+        if not client:
+            return ConnectionResult("qdrant", False, "Failed to initialize Qdrant client")
+        collection_name = getattr(settings, "QDRANT_COLLECTION", "enterprise_rag")
+        if client.collection_exists(collection_name):
+            info = client.get_collection(collection_name)
+            count = info.points_count or 0
+            return ConnectionResult("qdrant", True, f"Qdrant reachable ({url}, points={count})")
+        else:
+            return ConnectionResult(
+                "qdrant", True, f"Qdrant reachable ({url}, collection '{collection_name}' uninitialized)"
+            )
+    except Exception as e:
+        logfire.warning(f"Qdrant health check failed: {e}")
+        return ConnectionResult("qdrant", False, str(e))
+
+
 def _check_pinecone() -> ConnectionResult:
     api_key = settings.PINECONE_API_KEY or os.getenv("PINECONE_API_KEY")
     host = settings.PINECONE_HOST or os.getenv("PINECONE_HOST")
@@ -236,6 +261,7 @@ def _check_langsmith() -> ConnectionResult:
 _CHECKERS: list[Callable[[], ConnectionResult]] = [
     _check_neon_postgres,
     _check_upstash_redis,
+    _check_qdrant,
     _check_pinecone,
     _check_portkey_gateway,
     _check_jina_embeddings,

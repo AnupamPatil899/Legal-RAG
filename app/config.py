@@ -38,7 +38,10 @@ class Settings(BaseSettings):
 
     # --- QDRANT VECTOR DB ---
     QDRANT_URL: str | None = Field(default=None, validation_alias=AliasChoices("QDRANT_URL", "QDRANT_CLUSTER_ENDPOINT"))
-    QDRANT_API_KEY: str | None = None
+    QDRANT_API_KEY: str | None = Field(default=None, validation_alias=AliasChoices("QDRANT_API_KEY", "QDRANT_SECURITY"))
+    QDRANT_SECURITY: str | None = Field(
+        default=None, validation_alias=AliasChoices("QDRANT_SECURITY", "QDRANT_API_KEY")
+    )
     QDRANT_COLLECTION: str = "enterprise_rag"
 
     # --- PINECONE VECTOR DB ---

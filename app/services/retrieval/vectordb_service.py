@@ -24,10 +24,34 @@ except (ImportError, AttributeError):
     pass
 
 
+from qdrant_client import QdrantClient
+from qdrant_client.models import FieldCondition, Filter, MatchValue
+
 from app.config import settings
 from app.services.retrieval.embedding import embed_query
 
 load_dotenv()
+
+
+def get_qdrant_client():
+    url = getattr(settings, "QDRANT_URL", None) or os.getenv("QDRANT_URL")
+    if not url:
+        return None
+    if url.startswith("https://") and ":" not in url[8:]:
+        url = f"{url.rstrip('/')}:443"
+    api_key = (
+        getattr(settings, "QDRANT_SECURITY", None)
+        or getattr(settings, "QDRANT_API_KEY", None)
+        or os.getenv("QDRANT_SECURITY")
+        or os.getenv("QDRANT_API_KEY")
+    )
+    return QdrantClient(
+        url=url,
+        api_key=api_key,
+        prefer_grpc=False,
+        check_compatibility=False,
+        timeout=15,
+    )
 
 
 def get_pinecone_index(pc_client: Pinecone, index_name: str = None):
@@ -43,6 +67,7 @@ def get_pinecone_index(pc_client: Pinecone, index_name: str = None):
     host = getattr(settings, "PINECONE_HOST", None) or os.getenv("PINECONE_HOST")
     if host:
         parsed = urlparse(host if host.startswith("http") else f"http://{host}")
+        scheme = parsed.scheme or "http"
         hostname = parsed.hostname or "localhost"
         try:
             r = requests.get(f"{host.rstrip('/')}/indexes", timeout=2)
@@ -51,15 +76,17 @@ def get_pinecone_index(pc_client: Pinecone, index_name: str = None):
                 for idx in data.get("indexes", []):
                     if idx.get("name") == index_name:
                         target_host = idx.get("host", "")
-                        if ":" in target_host:
+                        if scheme == "https":
+                            target_host = host.rstrip("/")
+                        elif ":" in target_host:
                             port = target_host.split(":")[-1]
-                            target_host = f"http://{hostname}:{port}"
+                            target_host = f"{scheme}://{hostname}:{port}"
                         elif not target_host.startswith("http"):
-                            target_host = f"http://{target_host}"
+                            target_host = f"{scheme}://{target_host}"
                         return pc_client.Index(name=index_name, host=target_host)
         except Exception:
             pass
-        index_host = f"http://{hostname}:5082"
+        index_host = host.rstrip("/") if scheme == "https" else f"{scheme}://{hostname}:5082"
         return pc_client.Index(name=index_name, host=index_host)
     return pc_client.Index(index_name)
 
@@ -85,9 +112,38 @@ MASTER_INDEX_NAME = getattr(settings, "PINECONE_INDEX_NAME", "legal-enterprise-k
     #    before_sleep=before_sleep_log(logfire, "warning"),
 )
 def _search_enterprise_knowledge(query: str, folder_name: str = None, limit: int = 8):
-    """Internal hybrid search with retry logic and optional metadata filtering."""
+    """Internal hybrid/dense search with retry logic and optional metadata filtering."""
+    qdrant = get_qdrant_client()
+    if qdrant:
+        collection_name = getattr(settings, "QDRANT_COLLECTION", "enterprise_rag")
+        dense_vector = embed_query(query)
+
+        qdrant_filter = None
+        if folder_name:
+            qdrant_filter = Filter(must=[FieldCondition(key="folder_name", match=MatchValue(value=folder_name))])
+
+        res = qdrant.query_points(
+            collection_name=collection_name,
+            query=dense_vector,
+            query_filter=qdrant_filter,
+            limit=limit,
+        )
+
+        results = []
+        for point in res.points:
+            payload = point.payload or {}
+            results.append(
+                {
+                    "content": payload.get("text", ""),
+                    "source": payload.get("source", "Unknown"),
+                    "folder": payload.get("folder_name", "Unknown"),
+                    "score": point.score,
+                }
+            )
+        return results
+
     if client is None:
-        raise RuntimeError("Neither PINECONE_API_KEY nor PINECONE_HOST is set")
+        raise RuntimeError("Neither QDRANT_URL nor PINECONE_API_KEY/PINECONE_HOST is set")
 
     dense_vector = embed_query(query)
     sparse_vector = bm25.encode_queries(query)
@@ -121,12 +177,12 @@ def _search_enterprise_knowledge(query: str, folder_name: str = None, limit: int
 
 def search_enterprise_knowledge(query: str, folder_name: str = None, limit: int = 8):
     """
-    Performs a high-precision HYBRID search in the enterprise knowledge base.
+    Performs a high-precision search in the enterprise knowledge base.
     Optionally filters by `folder_name` metadata.
     """
     try:
         return _search_enterprise_knowledge(query, folder_name=folder_name, limit=limit)
     except Exception as e:
-        # logfire.error(f"❌ Pinecone Search Failed after retries: {e}")
-        print(f"❌ Pinecone Search Failed after retries: {e}")
+        # logfire.error(f"❌ Vector Search Failed after retries: {e}")
+        print(f"❌ Vector Search Failed after retries: {e}")
         return []

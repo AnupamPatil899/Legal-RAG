@@ -35,9 +35,15 @@ from app.ingestion.loaders.text import parse_text
 from app.services.retrieval.embedding import embed_texts, get_embedding_dim
 
 
-from app.services.retrieval.vectordb_service import get_pinecone_index
+from qdrant_client.models import Distance, PointStruct, VectorParams
+
+from app.services.retrieval.vectordb_service import get_pinecone_index, get_qdrant_client
 
 PROCESSED_DATA_DIR = "processed_data"
+
+# Initialize Qdrant Client (if configured)
+qdrant_client = get_qdrant_client()
+QDRANT_COLLECTION = getattr(settings, "QDRANT_COLLECTION", "enterprise_rag")
 
 # Initialize Pinecone Client
 _pinecone_api_key = getattr(settings, "PINECONE_API_KEY", None) or os.getenv("PINECONE_API_KEY") or "pclocal"
@@ -47,15 +53,13 @@ _pc_kwargs = {"api_key": _pinecone_api_key}
 if _pinecone_host:
     _pc_kwargs["host"] = _pinecone_host
 
-pc = Pinecone(**_pc_kwargs)
+pc = Pinecone(**_pc_kwargs) if (_pinecone_api_key or _pinecone_host) else None
 
 # Initialize BM25 Encoder for Hybrid Search (Sparse Vectors)
 bm25 = BM25Encoder.default()
 
-
-# Define your single master index name
+# Define single master index name
 MASTER_INDEX_NAME = getattr(settings, "PINECONE_INDEX_NAME", "legal-enterprise-knowledge-base")
-
 
 # Load Metadata globally to avoid reading the file repeatedly
 METADATA_CSV_PATH = "/home/anupa/CUDA_Rag/DATA/master_clauses_updated_final.csv"
@@ -67,26 +71,39 @@ else:
     print("metadata.csv not found. Operating without extended metadata.")
     METADATA_MAP = {}
 
-# Ensure the master index exists ONCE at startup
-try:
-    existing_indexes = [idx.name for idx in pc.list_indexes()]
-    if MASTER_INDEX_NAME not in existing_indexes:
-        dim = get_embedding_dim()
-        create_kwargs = {
-            "name": MASTER_INDEX_NAME,
-            "dimension": dim,
-            "metric": "dotproduct",  # Required for Hybrid Search
-        }
-        if not _pinecone_host:
-            create_kwargs["spec"] = ServerlessSpec(cloud="aws", region="us-east-1")
-        pc.create_index(**create_kwargs)
-        logfire.info(f"Created new master Pinecone index: {MASTER_INDEX_NAME}")
-        print(f"Created new master Pinecone index: {MASTER_INDEX_NAME}")
-except Exception as e:
-    print(f"Note: Pinecone index check/creation skipped: {e}")
+# Ensure the collection/index exists at startup
+dim = get_embedding_dim()
 
-# Connect to the single master index
-master_index = get_pinecone_index(pc, MASTER_INDEX_NAME)
+if qdrant_client:
+    try:
+        if not qdrant_client.collection_exists(QDRANT_COLLECTION):
+            qdrant_client.create_collection(
+                collection_name=QDRANT_COLLECTION,
+                vectors_config=VectorParams(size=dim, distance=Distance.DOT),
+            )
+            logfire.info(f"Created new Qdrant collection: {QDRANT_COLLECTION}")
+            print(f"Created new Qdrant collection: {QDRANT_COLLECTION}")
+    except Exception as e:
+        print(f"Note: Qdrant collection check/creation skipped: {e}")
+
+master_index = None
+if pc and not qdrant_client:
+    try:
+        existing_indexes = [idx.name for idx in pc.list_indexes()]
+        if MASTER_INDEX_NAME not in existing_indexes:
+            create_kwargs = {
+                "name": MASTER_INDEX_NAME,
+                "dimension": dim,
+                "metric": "dotproduct",  # Required for Hybrid Search
+            }
+            if not _pinecone_host:
+                create_kwargs["spec"] = ServerlessSpec(cloud="aws", region="us-east-1")
+            pc.create_index(**create_kwargs)
+            logfire.info(f"Created new master Pinecone index: {MASTER_INDEX_NAME}")
+            print(f"Created new master Pinecone index: {MASTER_INDEX_NAME}")
+        master_index = get_pinecone_index(pc, MASTER_INDEX_NAME)
+    except Exception as e:
+        print(f"Note: Pinecone index check/creation skipped: {e}")
 
 
 def save_processed_locally(data: dict, source_type: str, filename: str) -> str:
@@ -138,33 +155,57 @@ def process_file(file_path: str, filename: str, source_type: str):
             if "folder_name" not in file_meta:
                 file_meta["folder_name"] = source_type
 
-            # 4. Vectorize & Upsert to Master Index
+            # 4. Vectorize & Upsert to Active Vector DB
             with logfire.span("Vectorizing & Indexing"):
-                # if 2 > 1:
                 dense_embeddings = embed_texts(chunks)
-                sparse_embeddings = bm25.encode_documents(chunks)
 
-                points = []
-                for chunk, dense, sparse in zip(chunks, dense_embeddings, sparse_embeddings):
-                    payload = dict(file_meta)
-                    payload["text"] = chunk
-                    payload["source"] = filename
-                    payload["source_type"] = source_type
+                if qdrant_client:
+                    qdrant_points = []
+                    for chunk, dense in zip(chunks, dense_embeddings):
+                        payload = dict(file_meta)
+                        payload["text"] = chunk
+                        payload["source"] = filename
+                        payload["source_type"] = source_type
 
-                    # Pinecone limits sparse vector size to max 2048 elements
-                    if sparse and isinstance(sparse, dict) and "indices" in sparse and len(sparse["indices"]) > 2048:
-                        pairs = sorted(zip(sparse["indices"], sparse["values"]), key=lambda x: x[1], reverse=True)[
-                            :2048
-                        ]
-                        sparse = {"indices": [p[0] for p in pairs], "values": [p[1] for p in pairs]}
+                        qdrant_points.append(
+                            PointStruct(
+                                id=str(uuid.uuid4()),
+                                vector=dense,
+                                payload=payload,
+                            )
+                        )
+                    qdrant_client.upsert(collection_name=QDRANT_COLLECTION, points=qdrant_points)
+                    logfire.info(f"Indexed {len(qdrant_points)} points to Qdrant collection '{QDRANT_COLLECTION}'.")
+                    print(f"Indexed {len(qdrant_points)} points to Qdrant collection '{QDRANT_COLLECTION}'.")
+                elif master_index:
+                    sparse_embeddings = bm25.encode_documents(chunks)
+                    points = []
+                    for chunk, dense, sparse in zip(chunks, dense_embeddings, sparse_embeddings):
+                        payload = dict(file_meta)
+                        payload["text"] = chunk
+                        payload["source"] = filename
+                        payload["source_type"] = source_type
 
-                    points.append(
-                        {"id": str(uuid.uuid4()), "values": dense, "sparse_values": sparse, "metadata": payload}
-                    )
+                        if (
+                            sparse
+                            and isinstance(sparse, dict)
+                            and "indices" in sparse
+                            and len(sparse["indices"]) > 2048
+                        ):
+                            pairs = sorted(zip(sparse["indices"], sparse["values"]), key=lambda x: x[1], reverse=True)[
+                                :2048
+                            ]
+                            sparse = {"indices": [p[0] for p in pairs], "values": [p[1] for p in pairs]}
 
-                master_index.upsert(vectors=points)
-                logfire.info(f"Indexed {len(points)} points to '{MASTER_INDEX_NAME}'.")
-                print(f"Indexed {len(points)} points to '{MASTER_INDEX_NAME}'.")
+                        points.append(
+                            {"id": str(uuid.uuid4()), "values": dense, "sparse_values": sparse, "metadata": payload}
+                        )
+
+                    master_index.upsert(vectors=points)
+                    logfire.info(f"Indexed {len(points)} points to '{MASTER_INDEX_NAME}'.")
+                    print(f"Indexed {len(points)} points to '{MASTER_INDEX_NAME}'.")
+                else:
+                    print("⚠️ No active Vector DB client configured for indexing.")
 
         except Exception as e:
             logfire.error(f"Failed to process {filename}: {e}")

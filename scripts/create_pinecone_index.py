@@ -42,7 +42,7 @@ try:
             "metric": METRIC,
         }
         if not host or "localhost" not in host:
-            create_kwargs["spec"] = ServerlessSpec(cloud="aws", region="us-east-1")
+            create_kwargs["spec"] = ServerlessSpec(cloud="gcp", region="us-central1")
         pc.create_index(**create_kwargs)
         print(f"✅ Successfully created index '{INDEX_NAME}' (dimension={DIMENSION}, metric='{METRIC}')")
     else:
