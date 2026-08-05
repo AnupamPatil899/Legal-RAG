@@ -10,6 +10,7 @@ def test_pinecone_search_retries_then_returns_empty():
     """Pinecone search should retry transient failures and finally return []."""
     mock_client = MagicMock()
     with (
+        patch("app.services.retrieval.vectordb_service.get_qdrant_client", return_value=None),
         patch("app.services.retrieval.vectordb_service.client", mock_client),
         patch("app.services.retrieval.vectordb_service.embed_query") as mock_embed,
         patch("app.services.retrieval.vectordb_service.bm25") as mock_bm25,
@@ -26,6 +27,22 @@ def test_pinecone_search_retries_then_returns_empty():
         assert results == []
         # Tenacity default: initial call + 2 retries = 3 attempts
         assert mock_index.query.call_count == 3
+
+
+def test_qdrant_search_retries_then_returns_empty():
+    """Qdrant search should retry transient failures and finally return []."""
+    mock_qdrant = MagicMock()
+    mock_qdrant.query_points.side_effect = RuntimeError("transient")
+    with (
+        patch("app.services.retrieval.vectordb_service.get_qdrant_client", return_value=mock_qdrant),
+        patch("app.services.retrieval.vectordb_service.embed_query") as mock_embed,
+    ):
+        mock_embed.return_value = [0.0] * 1024
+
+        results = search_enterprise_knowledge("test query", limit=1)
+
+        assert results == []
+        assert mock_qdrant.query_points.call_count == 3
 
 
 def test_rerank_retries_then_falls_back():
