@@ -98,6 +98,14 @@ if prompt := st.chat_input("Ask about your documentation..."):
                         # First guardrails invocation can be slow as NeMo downloads
                         # configs/models; allow up to 3 minutes.
                         response = requests.post(url, json=payload, headers=headers, timeout=180)
+                        if response.status_code == 401:
+                            raise RuntimeError(
+                                "Invalid or missing API key (HTTP 401). "
+                                "Ensure RAG_API_KEY environment variable is set on the frontend Cloud Run service "
+                                "and matches the backend's RAG_API_KEY."
+                            )
+                        if response.status_code != 200:
+                            raise RuntimeError(f"Backend returned HTTP {response.status_code}: {response.text}")
                         data = response.json()
 
                     # Guardrails can block synchronously.

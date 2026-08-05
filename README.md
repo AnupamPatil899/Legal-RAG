@@ -1,19 +1,19 @@
 # Enterprise Agentic RAG (Scalable Pipeline)
 
-A production-grade, enterprise-level RAG system built with **LangGraph**, **Portkey LLM Gateway**, **OpenAI**, and **Jina AI Embeddings/Reranker**. The system distinguishes between technical "True Data" and random "Noisy Data" using semantic re-ranking, history-aware planning, and NeMo Guardrails for input/output safety.
+A production-grade, enterprise-level RAG system built with **LangGraph**, **Portkey LLM Gateway**, **OpenAI**, **Qdrant Vector Database**, and **Jina AI Embeddings/Reranker**. The system distinguishes between technical "True Data" and random "Noisy Data" using semantic re-ranking, history-aware planning, and NeMo Guardrails for input/output safety.
 
 ## Key Features
 
 - **Agentic Intelligence**: LangGraph for cyclic reasoning, multi-step planning, and conversation memory.
 - **Guardrails**: NeMo Guardrails gate blocks off-topic, jailbreak, and injection inputs before any retrieval.
-- **LLM Gateway**: Portkey routes all LLM calls with automatic fallback between Gemini, Kimi and llama via your configured Portkey virtual providers.
-- **Enterprise Search**: Pinecone Cloud for high-performance vector search + Jina AI Reranker API for semantic reranking.
+- **LLM Gateway**: Portkey routes all LLM calls with automatic fallback between Gemini, Kimi, and Llama via your configured Portkey virtual providers.
+- **Enterprise Search**: **Qdrant Vector Database** for high-performance vector search + Jina AI Reranker API for semantic reranking (with Pinecone fallback).
 - **Jina AI Embeddings**: `jina-embeddings-v3` (1024-dim) via Jina API, with local `mxbai-embed-large-v1` fallback.
 - **Local Document Parsing**: PDF, HTML, TXT, DOCX, PPTX parsed entirely on-device — no external OCR service.
 - **Observability**: Full trace nesting with **Pydantic Logfire** and **LangSmith** across every agent node.
 - **Metrics**: Prometheus `/metrics` endpoint with custom RAG and guardrails counters.
 - **Synchronous `/query`**: The LangGraph pipeline runs directly inside the `/query` endpoint and returns the final answer.
-- **API Key & Rate Limiting**: Optional bearer-token auth and Redis-backed (or in-memory) rate limiting.
+- **API Security & Rate Limiting**: Bearer-token authentication via GCP Secret Manager and Redis-backed (or in-memory) rate limiting.
 - **Evaluation Suite**: RAGAS-powered eval pipeline (6 metrics) with a dedicated Streamlit demo app and a headless `evals/run_evals.py` script.
 
 ---
@@ -29,10 +29,11 @@ graph TD
     Guard -->|Pass| Planner{Planner Node}
     Planner -->|Conversational| Responder[Responder Node]
     Planner -->|Technical| Retriever[Retriever Node]
-    Retriever --> Reranker[Jina AI Reranker API]
+    Retriever --> Qdrant[Qdrant Vector DB]
+    Qdrant --> Reranker[Jina AI Reranker API]
     Reranker --> Responder
     Responder --> UI
-    Responder -.-> Memory[(LangGraph MemorySaver)]
+    Responder -.-> Memory[(LangGraph Postgres Checkpointer)]
 ```
 
 ---
@@ -43,21 +44,22 @@ graph TD
 ├── app/
 │   ├── agents/
 │   │   └── nodes/       # Planner, Retriever, Responder LangGraph nodes
-│   ├── gateway/         # Portkey LLM gateway — primary + fallback Groq routing
+│   ├── gateway/         # Portkey LLM gateway — primary + fallback routing
 │   ├── guardrails/      # NeMo Guardrails input/output filtering
 │   ├── ingestion/
 │   │   ├── chunking/    # Paragraph-based text splitter (1500 char max)
 │   │   └── loaders/     # Local parsers — PDF (pypdf), HTML, TXT, DOCX, PPTX
 │   ├── services/
-│   │   └── retrieval/   # Jina AI embeddings + Pinecone Hybrid search + Jina AI reranking
+│   │   └── retrieval/   # Jina AI embeddings + Qdrant / Pinecone search + Jina AI reranking
 │   ├── config.py        # Centralized environment variable management
 │   └── main.py          # FastAPI entrypoint — guardrails gate + /query endpoint
 ├── evals/               # RAGAS evaluation suite + Streamlit 3-tab demo
+├── scripts/             # Collection initialization scripts for Qdrant and Pinecone
 ├── ui/                  # Streamlit chat interface with reasoning step transparency
 ├── processed_data/      # Auto-generated — parsed & chunked JSON output per document
 ├── DOCS/                # Architectural and operational guides
 ├── DATA/                # Sample datasets (True vs Noisy documentation)
-├── Dockerfile           # Container definition (retained for reference)
+├── Dockerfile           # Multi-stage container definition
 └── requirements.txt     # Pinned dependencies
 ```
 
@@ -70,10 +72,12 @@ graph TD
 | Orchestration | LangChain + LangGraph |
 | LLMs | Kimi + Llama/Gemini fallback via **Portkey** gateway |
 | Guardrails | NeMo Guardrails |
-| Vector DB | Pinecone Cloud |
+| Vector DB | **Qdrant** (Primary) / Pinecone (Fallback) |
 | Reranking | Jina AI Reranker API (`jina-reranker-v3`) |
 | Embeddings | Jina AI `jina-embeddings-v3` (1024-dim) + local mxbai fallback |
 | Document Parsing | pypdf + pdfplumber (local, no OCR service) |
+| Persistence | Neon Serverless Postgres (LangGraph checkpointer) |
+| Rate Limiting | Upstash Redis |
 | Observability | Pydantic Logfire + LangSmith |
 | Evaluation | RAGAS + custom Tool Correctness (Jaccard) |
 
@@ -83,9 +87,9 @@ graph TD
 
 ### 1. Install dependencies
 
-```powershell
-python -m venv tenvv
-.\tenvv\Scripts\activate
+```bash
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
@@ -104,11 +108,13 @@ PORTKEY_PRIMARY_CONFIG_ID = "pc-xxxxxxxxxxxxxxxx"
 # Jina AI Embeddings + Reranker API
 JINA_API_KEY = "your-jina-api-key"
 
-# Vector DB — Pinecone Setup
-# For Pinecone Cloud: set PINECONE_API_KEY (leave PINECONE_HOST empty)
+# Vector DB — Qdrant Setup (Primary)
+QDRANT_URL = "https://your-qdrant-cluster.cloud.qdrant.io:443"
+QDRANT_API_KEY = "your-qdrant-api-key"
+QDRANT_COLLECTION = "enterprise_rag"
+
+# Vector DB — Pinecone Setup (Fallback)
 PINECONE_API_KEY = "your-pinecone-api-key"
-# For Local Development via Docker: uncomment PINECONE_HOST
-# PINECONE_HOST = "http://localhost:5081"
 PINECONE_INDEX_NAME = "legal-enterprise-knowledge-base"
 
 # Production persistence (Neon) & cache (Upstash Redis)
@@ -117,7 +123,7 @@ UPSTASH_REDIS_REST_URL = "https://your-db.upstash.io"
 UPSTASH_REDIS_REST_TOKEN = "your-upstash-token"
 
 # API safety
-RAG_API_KEY = ""                       # set in production to require bearer auth
+RAG_API_KEY = "your-rag-api-bearer-key"       # set to require bearer auth
 RATE_LIMIT_PER_MINUTE = 20
 
 # Observability
@@ -134,81 +140,72 @@ JUDGE_OPENAI_API_KEY = "..."
 BACKEND_URL = "http://localhost:8000"
 ```
 
-### 3. Initialize Pinecone & Data Ingestion
+---
 
-#### A. Create the Pinecone Index
-For local development using Docker Compose:
+### 3. Vector DB Setup & Data Ingestion
+
+#### A. Initialize Qdrant Collection
+Create the `enterprise_rag` collection with 1024-dimensional vectors matching `jina-embeddings-v3`:
+
 ```bash
-# Start local Pinecone emulator container
-docker compose up -d pinecone-local
-
-# Create local or cloud Pinecone index (1024-dim hybrid dotproduct metric)
-python scripts/create_pinecone_index.py
+python scripts/create_qdrant_collection.py
 ```
 
-#### B. Ingest Data
-Parses all documents in `DATA/`, chunks them, saves metadata to `processed_data/`, and indexes vectors into Pinecone.
+*(Optionally for Pinecone fallback: run `python scripts/create_pinecone_index.py`)*
 
-```powershell
+#### B. Ingest Data
+Parses all documents in `DATA/` (PDF, HTML, TXT, DOCX, PPTX), generates embeddings via Jina AI, saves chunk metadata to `processed_data/`, and indexes vectors into Qdrant:
+
+```bash
 python -m app.ingestion.processor DATA --wipe
 ```
 
-> Pass `--wipe` to drop and recreate the Pinecone index. Omit it to append to an existing index.
+> Pass `--wipe` to re-create the vector collection and clean existing points before indexing.
 
 ---
 
-## Deployment & CI/CD (GitHub Actions)
+## Deployment & GCP Cloud Run Setup
 
-### How Pinecone Works in GitHub Actions & Cloud Run
+### 1. Automated Deployment via GitHub Actions (`cd.yml`)
 
-1. **GitHub Actions CI (`ci.yml`)**:
-   - Automated unit tests run against mocks (`MagicMock`). No live Pinecone cluster or local Docker container is needed for CI test runs.
+The repository includes GitHub Actions workflows (`.github/workflows/ci.yml` and `.github/workflows/cd.yml`) that automatically test, build, and deploy container images to **GCP Cloud Run** (`rag-api` and `rag-ui`) on push to `main`.
 
-2. **Hosting Local Pinecone Container on GCP (Cloud Run)**:
-   You can run the free `pinecone-local` Docker container image directly on GCP Cloud Run:
-   ```bash
-   gcloud run deploy pinecone-local \
-     --image=ghcr.io/pinecone-io/pinecone-local:latest \
-     --port=5081 \
-     --region=us-central1 \
-     --memory=2Gi \
-     --allow-unauthenticated
-   ```
-   *Take note of the service URL generated by GCP (e.g. `https://pinecone-local-xyz123-uc.a.run.app`).*
+### 2. API Authentication & GCP Secret Manager
 
-3. **Create Index & Ingest Data into GCP Pinecone Container**:
-   - **Create Index**:
-     ```bash
-     PINECONE_HOST="https://pinecone-local-xyz123-uc.a.run.app" python scripts/create_pinecone_index.py
-     ```
-   - **Ingest Data**:
-     ```bash
-     PINECONE_HOST="https://pinecone-local-xyz123-uc.a.run.app" python -m app.ingestion.processor DATA --wipe
-     ```
+Secure your API endpoints by storing `RAG_API_KEY` and database credentials in **GCP Secret Manager**:
 
-4. **Linking `rag-api` & `rag-ui` to GCP Pinecone Container**:
-   - Update `rag-api` on GCP Cloud Run to use your container host:
-     ```bash
-     gcloud run services update rag-api \
-       --region=us-central1 \
-       --set-env-vars="PINECONE_HOST=https://pinecone-local-xyz123-uc.a.run.app,PINECONE_API_KEY=pclocal"
-     ```
-   - For automated deployments via GitHub Actions (`cd.yml`), add `PINECONE_HOST` in GitHub Repository Secrets and pass `--set-env-vars=PINECONE_HOST=${{ secrets.PINECONE_HOST }}` in `cd.yml`.
+```bash
+# 1. Create secret in Secret Manager
+gcloud secrets create RAG_API_KEY --replication-policy="automatic"
+echo -n "YOUR_SECRET_BEARER_KEY" | gcloud secrets versions add RAG_API_KEY --data-file=-
 
+# 2. Grant Cloud Run service account access to read secrets
+PROJECT_NUMBER=$(gcloud projects describe $(gcloud config get-value project) --format="value(projectNumber)")
+gcloud secrets add-iam-policy-binding RAG_API_KEY \
+  --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
+  --role="roles/secretmanager.secretAccessor"
+
+# 3. Mount secrets as environment variables on Cloud Run
+gcloud run services update rag-api \
+  --update-secrets=RAG_API_KEY=RAG_API_KEY:latest \
+  --region asia-south1
+
+gcloud run services update rag-ui \
+  --update-secrets=RAG_API_KEY=RAG_API_KEY:latest \
+  --region asia-south1
+```
 
 ---
 
-### 4. Launch the app
+### 4. Launching Locally
 
+You can verify all external connections before starting the server:
+```bash
+python -m app.services.health.connection_checker
+```
 
-The `/query` endpoint runs the LangGraph pipeline synchronously. You only need the FastAPI server and (optionally) the Streamlit UI. Redis and Postgres are managed by Upstash and Neon; no local persistence services are required.
-
-> **Tip:** You can verify all external connections before starting the server:
-> ```bash
-> python -m app.services.health.connection_checker
-> ```
-
-```powershell
+Run backend and frontend:
+```bash
 # Terminal 1 — FastAPI backend
 uvicorn app.main:app --reload --port 8000
 

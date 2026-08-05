@@ -92,4 +92,4 @@ jobs:
             --command="streamlit" \
             --args="run,ui/dashboard.py,--server.port,8080,--server.address,0.0.0.0" \
             --set-env-vars=BACKEND_URL=${BACKEND_URL},LOGFIRE_IGNORE_NO_CONFIG=1 \
-            --set-secrets=LOGFIRE_TOKEN=LOGFIRE_TOKEN:latest
+            --set-secrets=LOGFIRE_TOKEN=LOGFIRE_TOKEN:latest,RAG_API_KEY=RAG_API_KEY:latest
