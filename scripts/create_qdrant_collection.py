@@ -2,7 +2,7 @@ import os
 import sys
 
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams
+from qdrant_client.models import Distance, HnswConfigDiff, OptimizersConfigDiff, VectorParams
 
 # Add project root to sys.path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -26,6 +26,8 @@ QDRANT_API_KEY = (
 )
 COLLECTION_NAME = settings.QDRANT_COLLECTION or os.getenv("QDRANT_COLLECTION", "enterprise_rag")
 DIMENSION = get_embedding_dim()  # 1024 for jina-embeddings-v3 / mxbai-embed-large-v1
+MAX_INDEXING_THREADS = int(os.getenv("QDRANT_MAX_INDEXING_THREADS", "1"))
+INDEXING_THRESHOLD = int(os.getenv("QDRANT_INDEXING_THRESHOLD", "2000"))
 
 print(f"Connecting to Qdrant at '{QDRANT_URL}'...")
 client = QdrantClient(
@@ -38,17 +40,38 @@ client = QdrantClient(
 
 try:
     if not client.collection_exists(COLLECTION_NAME):
-        print(f"Creating collection '{COLLECTION_NAME}' (dimension={DIMENSION}, distance=DOT/COSINE)...")
+        print(
+            f"Creating collection '{COLLECTION_NAME}' (dim={DIMENSION}, distance=DOT, "
+            f"indexing_threshold={INDEXING_THRESHOLD}, threads={MAX_INDEXING_THREADS})..."
+        )
         client.create_collection(
             collection_name=COLLECTION_NAME,
             vectors_config=VectorParams(size=DIMENSION, distance=Distance.DOT),
+            hnsw_config=HnswConfigDiff(max_indexing_threads=MAX_INDEXING_THREADS),
+            optimizers_config=OptimizersConfigDiff(
+                indexing_threshold=INDEXING_THRESHOLD,
+                max_optimization_threads=MAX_INDEXING_THREADS,
+            ),
         )
         print(f"✅ Successfully created Qdrant collection '{COLLECTION_NAME}'")
     else:
-        print(f"ℹ️ Qdrant collection '{COLLECTION_NAME}' already exists")
+        print(f"ℹ️ Qdrant collection '{COLLECTION_NAME}' already exists. Updating HNSW and Optimizer configurations...")
+        client.update_collection(
+            collection_name=COLLECTION_NAME,
+            hnsw_config=HnswConfigDiff(max_indexing_threads=MAX_INDEXING_THREADS),
+            optimizer_config=OptimizersConfigDiff(
+                indexing_threshold=INDEXING_THRESHOLD,
+                max_optimization_threads=MAX_INDEXING_THREADS,
+            ),
+        )
+        print(f"✅ Updated collection '{COLLECTION_NAME}' (indexing_threshold={INDEXING_THRESHOLD}, threads={MAX_INDEXING_THREADS})")
 
     info = client.get_collection(COLLECTION_NAME)
-    print(f"\nCollection '{COLLECTION_NAME}' status: {info.status}, points_count: {info.points_count}")
+    print(
+        f"\nCollection '{COLLECTION_NAME}' status: {info.status}, "
+        f"points_count: {info.points_count}, indexed_vectors_count: {info.indexed_vectors_count}"
+    )
 except Exception as e:
-    print(f"❌ Failed to connect or create collection on Qdrant at '{QDRANT_URL}': {e}")
+    print(f"❌ Failed to connect or configure collection on Qdrant at '{QDRANT_URL}': {e}")
     sys.exit(1)
+

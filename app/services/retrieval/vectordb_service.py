@@ -50,7 +50,7 @@ def get_qdrant_client():
         api_key=api_key,
         prefer_grpc=False,
         check_compatibility=False,
-        timeout=15,
+        timeout=90,
     )
 
 

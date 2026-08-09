@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     QDRANT_SECURITY: str | None = Field(
         default=None, validation_alias=AliasChoices("QDRANT_SECURITY", "QDRANT_API_KEY")
     )
-    QDRANT_COLLECTION: str = "enterprise_rag"
+    QDRANT_COLLECTION: str = "enterprise_rag_v1"
 
     # --- PINECONE VECTOR DB ---
     PINECONE_API_KEY: str | None = Field(default=None, validation_alias=AliasChoices("PINECONE_API_KEY"))

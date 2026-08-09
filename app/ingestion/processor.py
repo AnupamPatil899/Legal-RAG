@@ -35,7 +35,7 @@ from app.ingestion.loaders.text import parse_text
 from app.services.retrieval.embedding import embed_texts, get_embedding_dim
 
 
-from qdrant_client.models import Distance, PointStruct, VectorParams
+from qdrant_client.models import Distance, HnswConfigDiff, OptimizersConfigDiff, PointStruct, VectorParams
 
 from app.services.retrieval.vectordb_service import get_pinecone_index, get_qdrant_client
 
@@ -61,6 +61,11 @@ bm25 = BM25Encoder.default()
 # Define single master index name
 MASTER_INDEX_NAME = getattr(settings, "PINECONE_INDEX_NAME", "legal-enterprise-knowledge-base")
 
+# Global point batch queue to keep segment count low
+BATCH_QDRANT_POINTS = []
+BATCH_SIZE = 500
+UPSERT_SUB_BATCH = 200  # Max points per single Qdrant upsert HTTP call
+
 # Load Metadata globally to avoid reading the file repeatedly
 METADATA_CSV_PATH = "/home/anupa/CUDA_Rag/DATA/master_clauses_updated_final.csv"
 if os.path.exists(METADATA_CSV_PATH):
@@ -75,14 +80,62 @@ else:
 dim = get_embedding_dim()
 
 if qdrant_client:
+    import time
+
     try:
-        if not qdrant_client.collection_exists(QDRANT_COLLECTION):
-            qdrant_client.create_collection(
-                collection_name=QDRANT_COLLECTION,
-                vectors_config=VectorParams(size=dim, distance=Distance.DOT),
-            )
-            logfire.info(f"Created new Qdrant collection: {QDRANT_COLLECTION}")
-            print(f"Created new Qdrant collection: {QDRANT_COLLECTION}")
+        if "--wipe" in sys.argv:
+            if qdrant_client.collection_exists(QDRANT_COLLECTION):
+                print(f"🗑️ --wipe passed: Deleting collection '{QDRANT_COLLECTION}'...")
+                qdrant_client.delete_collection(QDRANT_COLLECTION)
+
+            # Wait for Qdrant to fully remove the storage folder on disk
+            for attempt in range(15):
+                if not qdrant_client.collection_exists(QDRANT_COLLECTION):
+                    break
+                time.sleep(2)
+            else:
+                print("⚠️ Warning: Collection still reported as existing after 30s wait.")
+
+            # Retry create_collection in case the disk folder lingers
+            created = False
+            for attempt in range(10):
+                try:
+                    qdrant_client.create_collection(
+                        collection_name=QDRANT_COLLECTION,
+                        vectors_config=VectorParams(size=dim, distance=Distance.DOT),
+                        hnsw_config=HnswConfigDiff(max_indexing_threads=2),
+                        optimizers_config=OptimizersConfigDiff(
+                            indexing_threshold=2000,
+                            max_optimization_threads=2,
+                            default_segment_number=2,
+                        ),
+                    )
+                    created = True
+                    print(f"✅ Created new Qdrant collection: {QDRANT_COLLECTION}")
+                    break
+                except Exception as ce:
+                    if "already exists" in str(ce) and attempt < 9:
+                        print(f"   Qdrant storage still cleaning up, retrying in 3s... (attempt {attempt + 1}/10)")
+                        time.sleep(3)
+                    else:
+                        raise
+            if not created:
+                print("❌ Failed to create collection after retries.")
+        else:
+            # No --wipe: just ensure collection exists
+            if not qdrant_client.collection_exists(QDRANT_COLLECTION):
+                qdrant_client.create_collection(
+                    collection_name=QDRANT_COLLECTION,
+                    vectors_config=VectorParams(size=dim, distance=Distance.DOT),
+                    hnsw_config=HnswConfigDiff(max_indexing_threads=2),
+                    optimizers_config=OptimizersConfigDiff(
+                        indexing_threshold=2000,
+                        max_optimization_threads=2,
+                        default_segment_number=2,
+                    ),
+                )
+                logfire.info(f"Created new Qdrant collection: {QDRANT_COLLECTION}")
+                print(f"Created new Qdrant collection: {QDRANT_COLLECTION}")
     except Exception as e:
         print(f"Note: Qdrant collection check/creation skipped: {e}")
 
@@ -106,6 +159,35 @@ if pc and not qdrant_client:
         print(f"Note: Pinecone index check/creation skipped: {e}")
 
 
+def flush_qdrant_points():
+    global BATCH_QDRANT_POINTS
+    if qdrant_client and BATCH_QDRANT_POINTS:
+        try:
+            if not qdrant_client.collection_exists(QDRANT_COLLECTION):
+                qdrant_client.create_collection(
+                    collection_name=QDRANT_COLLECTION,
+                    vectors_config=VectorParams(size=dim, distance=Distance.DOT),
+                    hnsw_config=HnswConfigDiff(max_indexing_threads=2),
+                    optimizers_config=OptimizersConfigDiff(
+                        indexing_threshold=2000,
+                        max_optimization_threads=2,
+                        default_segment_number=2,
+                    ),
+                )
+                print(f"✨ Auto-created Qdrant collection '{QDRANT_COLLECTION}' before bulk upsert.")
+        except Exception as e:
+            print(f"Note: Qdrant collection auto-creation check: {e}")
+
+        # Upsert in sub-batches to avoid 413 Request Entity Too Large from Qdrant REST API
+        total = len(BATCH_QDRANT_POINTS)
+        for i in range(0, total, UPSERT_SUB_BATCH):
+            sub_batch = BATCH_QDRANT_POINTS[i : i + UPSERT_SUB_BATCH]
+            qdrant_client.upsert(collection_name=QDRANT_COLLECTION, points=sub_batch)
+        logfire.info(f"Bulk indexed batch of {total} points to Qdrant (in sub-batches of {UPSERT_SUB_BATCH}).")
+        print(f"Bulk indexed batch of {total} points to Qdrant (in sub-batches of {UPSERT_SUB_BATCH}).")
+        BATCH_QDRANT_POINTS = []
+
+
 def save_processed_locally(data: dict, source_type: str, filename: str) -> str:
     folder = os.path.join(PROCESSED_DATA_DIR, source_type)
     os.makedirs(folder, exist_ok=True)
@@ -116,6 +198,7 @@ def save_processed_locally(data: dict, source_type: str, filename: str) -> str:
 
 
 def process_file(file_path: str, filename: str, source_type: str):
+    global BATCH_QDRANT_POINTS
     with logfire.span("Processing File", file=filename, source=source_type):
         try:
             # 1. Extract text
@@ -149,34 +232,32 @@ def process_file(file_path: str, filename: str, source_type: str):
                 {"filename": filename, "source_type": source_type, "chunks": chunks}, source_type, filename
             )
 
-            # 3. Grab Metadata (folder_name is already inside file_meta)
+            # 3. Grab Metadata
             file_meta = METADATA_MAP.get(filename, {})
-            # Ensure folder_name exists so we can filter on it later
             if "folder_name" not in file_meta:
                 file_meta["folder_name"] = source_type
 
-            # 4. Vectorize & Upsert to Active Vector DB
+            # 4. Vectorize & Queue for Bulk Upsert
             with logfire.span("Vectorizing & Indexing"):
                 dense_embeddings = embed_texts(chunks)
 
                 if qdrant_client:
-                    qdrant_points = []
                     for chunk, dense in zip(chunks, dense_embeddings):
                         payload = dict(file_meta)
                         payload["text"] = chunk
                         payload["source"] = filename
                         payload["source_type"] = source_type
 
-                        qdrant_points.append(
+                        BATCH_QDRANT_POINTS.append(
                             PointStruct(
                                 id=str(uuid.uuid4()),
                                 vector=dense,
                                 payload=payload,
                             )
                         )
-                    qdrant_client.upsert(collection_name=QDRANT_COLLECTION, points=qdrant_points)
-                    logfire.info(f"Indexed {len(qdrant_points)} points to Qdrant collection '{QDRANT_COLLECTION}'.")
-                    print(f"Indexed {len(qdrant_points)} points to Qdrant collection '{QDRANT_COLLECTION}'.")
+                        if len(BATCH_QDRANT_POINTS) >= BATCH_SIZE:
+                            flush_qdrant_points()
+
                 elif master_index:
                     sparse_embeddings = bm25.encode_documents(chunks)
                     points = []
@@ -214,7 +295,6 @@ def process_file(file_path: str, filename: str, source_type: str):
 
 def process_directory(dir_path: str, source_type: str):
     with logfire.span("Scanning Directory", path=dir_path, source=source_type):
-        # if 2 > 1:
         files = [f for f in os.listdir(dir_path) if os.path.isfile(os.path.join(dir_path, f))]
         for filename in files:
             process_file(os.path.join(dir_path, filename), filename, source_type)
@@ -222,7 +302,6 @@ def process_directory(dir_path: str, source_type: str):
 
 def run_universal_ingestion(base_dir: str, explicit_source_type: str = None):
     with logfire.span("Universal Ingestion Started", base_directory=base_dir):
-        # if 2 > 1:
         subdirs = [d for d in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, d))]
         if not subdirs:
             source_type = explicit_source_type or "general"
@@ -230,6 +309,9 @@ def run_universal_ingestion(base_dir: str, explicit_source_type: str = None):
         else:
             for subdir in subdirs:
                 process_directory(os.path.join(base_dir, subdir), subdir)
+
+        # Flush any remaining queued points
+        flush_qdrant_points()
 
 
 if __name__ == "__main__":
