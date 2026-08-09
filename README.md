@@ -62,10 +62,10 @@ graph TD
 │   ├── config.py        # Centralized environment variable management
 │   └── main.py          # FastAPI entrypoint — guardrails gate + /query endpoint
 ├── evals/               # RAGAS evaluation suite + Streamlit 3-tab demo
-├── scripts/             # Collection initialization scripts for Qdrant and Pinecone
+├── scripts/             # Collection setup, defragmentation & zero-cost cloud migration scripts
 ├── ui/                  # Streamlit chat interface with reasoning step transparency
 ├── processed_data/      # Auto-generated — parsed & chunked JSON output per document
-├── DOCS/                # Architectural and operational guides
+├── DOCS/                # Architectural, postmortem and operational guides
 ├── DATA/                # Sample datasets (True vs Noisy documentation)
 ├── Dockerfile           # Multi-stage container definition
 └── requirements.txt     # Pinned dependencies
@@ -80,7 +80,7 @@ graph TD
 | Orchestration | LangChain + LangGraph |
 | LLMs | Kimi + Llama/Gemini fallback via **Portkey** gateway |
 | Guardrails | NeMo Guardrails |
-| Vector DB | **Qdrant** (Primary) / Pinecone (Fallback) |
+| Vector DB | **Qdrant Cloud (Managed SaaS)** / Pinecone (Fallback) |
 | Reranking | Jina AI Reranker API (`jina-reranker-v3`) |
 | Embeddings | Jina AI `jina-embeddings-v3` (1024-dim) + local mxbai fallback |
 | Document Parsing | pypdf + pdfplumber (local, no OCR service) |
@@ -116,10 +116,10 @@ PORTKEY_PRIMARY_CONFIG_ID = "pc-xxxxxxxxxxxxxxxx"
 # Jina AI Embeddings + Reranker API
 JINA_API_KEY = "your-jina-api-key"
 
-# Vector DB — Qdrant Setup (Primary)
-QDRANT_URL = "https://your-qdrant-cluster.cloud.qdrant.io:443"
-QDRANT_API_KEY = "your-qdrant-api-key"
-QDRANT_COLLECTION = "enterprise_rag"
+# Vector DB — Qdrant Cloud (Managed SaaS)
+QDRANT_URL = "https://your-cluster-id.gcp.cloud.qdrant.io:6333"
+QDRANT_API_KEY = "your-qdrant-cloud-api-key"
+QDRANT_COLLECTION = "enterprise_rag_v1"
 
 # Vector DB — Pinecone Setup (Fallback)
 PINECONE_API_KEY = "your-pinecone-api-key"
@@ -150,10 +150,10 @@ BACKEND_URL = "http://localhost:8000"
 
 ---
 
-### 3. Vector DB Setup & Data Ingestion
+### 3. Vector DB Setup, Data Ingestion & Cloud Migration
 
 #### A. Initialize Qdrant Collection
-Create the `enterprise_rag` collection with 1024-dimensional vectors matching `jina-embeddings-v3`:
+Create the `enterprise_rag_v1` collection with 1024-dimensional vectors matching `jina-embeddings-v3`:
 
 ```bash
 python scripts/create_qdrant_collection.py
@@ -161,14 +161,25 @@ python scripts/create_qdrant_collection.py
 
 *(Optionally for Pinecone fallback: run `python scripts/create_pinecone_index.py`)*
 
-#### B. Ingest Data
-Parses all documents in `DATA/` (PDF, HTML, TXT, DOCX, PPTX), generates embeddings via Jina AI, saves chunk metadata to `processed_data/`, and indexes vectors into Qdrant:
+#### B. Ingest Data (Direct from Source)
+Parses all documents in `DATA/` (PDF, HTML, TXT, DOCX, PPTX), generates embeddings via Jina AI, saves chunk metadata to `processed_data/`, and bulk-indexes vectors into Qdrant:
 
 ```bash
 python -m app.ingestion.processor DATA --wipe
 ```
 
 > Pass `--wipe` to re-create the vector collection and clean existing points before indexing.
+
+#### C. Zero-Cost Vector Migration to Qdrant Cloud
+If vectors were previously stored in a local or GCP Docker Qdrant container, transfer all points, 1024-dim dense vectors, and metadata directly to Qdrant Cloud **without calling embedding APIs or spending credits**:
+
+```bash
+DEST_QDRANT_URL="https://your-cluster-id.gcp.cloud.qdrant.io:6333" DEST_QDRANT_API_KEY="your-key" python scripts/migrate_to_qdrant_cloud.py
+```
+
+> 📖 **Architecture & Deep Dive Documentation**:
+> - [Qdrant Failure Postmortem & Cloud Migration Architecture](DOCS/QDRANT_FAILURE_POSTMORTEM_AND_MIGRATION.md)
+> - [Qdrant Optimization & Troubleshooting Guide](DOCS/QDRANT_OPTIMIZATION.md)
 
 ---
 
