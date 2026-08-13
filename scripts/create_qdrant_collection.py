@@ -64,7 +64,9 @@ try:
                 max_optimization_threads=MAX_INDEXING_THREADS,
             ),
         )
-        print(f"✅ Updated collection '{COLLECTION_NAME}' (indexing_threshold={INDEXING_THRESHOLD}, threads={MAX_INDEXING_THREADS})")
+        print(
+            f"✅ Updated collection '{COLLECTION_NAME}' (indexing_threshold={INDEXING_THRESHOLD}, threads={MAX_INDEXING_THREADS})"
+        )
 
     info = client.get_collection(COLLECTION_NAME)
     print(
@@ -74,4 +76,3 @@ try:
 except Exception as e:
     print(f"❌ Failed to connect or configure collection on Qdrant at '{QDRANT_URL}': {e}")
     sys.exit(1)
-

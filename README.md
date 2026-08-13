@@ -1,6 +1,6 @@
-# Enterprise Agentic RAG (Scalable Pipeline)
+# ClauseAI — Agentic Legal Document Intelligence Engine
 
-A production-grade, enterprise-level RAG system built with **LangGraph**, **Portkey LLM Gateway**, **OpenAI**, **Qdrant Vector Database**, and **Jina AI Embeddings/Reranker**. The system distinguishes between technical "True Data" and random "Noisy Data" using semantic re-ranking, history-aware planning, and NeMo Guardrails for input/output safety.
+A production-grade, enterprise-level **legal contract RAG system** built with **LangGraph**, **Portkey LLM Gateway**, **Qdrant Vector Database**, and **Jina AI Embeddings/Reranker**. ClauseAI retrieves and reasons over SEC contract filings, distinguishes between technical "True Data" and random "Noisy Data" using semantic re-ranking, history-aware planning, and NeMo Guardrails for input/output safety.
 
 ## 🚀 Live Demo & API Endpoints
 
@@ -13,16 +13,16 @@ A production-grade, enterprise-level RAG system built with **LangGraph**, **Port
 ## Key Features
 
 - **Agentic Intelligence**: LangGraph for cyclic reasoning, multi-step planning, and conversation memory.
-- **Guardrails**: NeMo Guardrails gate blocks off-topic, jailbreak, and injection inputs before any retrieval.
-- **LLM Gateway**: Portkey routes all LLM calls with automatic fallback between Gemini, Kimi, and Llama via your configured Portkey virtual providers.
-- **Enterprise Search**: **Qdrant Vector Database** for high-performance vector search + Jina AI Reranker API for semantic reranking (with Pinecone fallback).
+- **Guardrails**: NeMo Guardrails + deterministic off-topic pattern filtering blocks jailbreak, injection, and irrelevant inputs before any retrieval.
+- **LLM Gateway**: Portkey routes all LLM calls with automatic multi-key, multi-model fallback across 4 API accounts and a cascading model chain (`gpt-oss-120b → gpt-oss-20b → llama-3.3-70b → llama-3.1-8b`).
+- **Enterprise Search**: **Qdrant Vector Database** with entity-aware filtering (company name extraction + synonym mapping) + Jina AI Reranker API for semantic reranking.
 - **Jina AI Embeddings**: `jina-embeddings-v3` (1024-dim) via Jina API, with local `mxbai-embed-large-v1` fallback.
 - **Local Document Parsing**: PDF, HTML, TXT, DOCX, PPTX parsed entirely on-device — no external OCR service.
 - **Observability**: Full trace nesting with **Pydantic Logfire** and **LangSmith** across every agent node.
 - **Metrics**: Prometheus `/metrics` endpoint with custom RAG and guardrails counters.
 - **Synchronous `/query`**: The LangGraph pipeline runs directly inside the `/query` endpoint and returns the final answer.
 - **API Security & Rate Limiting**: Bearer-token authentication via GCP Secret Manager and Redis-backed (or in-memory) rate limiting.
-- **Evaluation Suite**: RAGAS-powered eval pipeline (6 metrics) with a dedicated Streamlit demo app and a headless `evals/run_evals.py` script.
+- **Evaluation Suite**: RAGAS-powered eval pipeline (6 metrics + guardrails accuracy) with Streamlit demo app, headless CLI runner, and OpenRouter 70B judge.
 
 ---
 
@@ -30,19 +30,66 @@ A production-grade, enterprise-level RAG system built with **LangGraph**, **Port
 
 ```mermaid
 graph TD
-    User((User)) --> UI[Streamlit UI]
-    UI --> API[FastAPI /query]
-    API --> Guard{NeMo Guardrails}
-    Guard -->|Blocked| UI
-    Guard -->|Pass| Planner{Planner Node}
-    Planner -->|Conversational| Responder[Responder Node]
-    Planner -->|Technical| Retriever[Retriever Node]
-    Retriever --> Qdrant[Qdrant Vector DB]
-    Qdrant --> Reranker[Jina AI Reranker API]
-    Reranker --> Responder
+    User((User)) --> UI[Streamlit Chat UI]
+    UI -->|Bearer Auth| API[FastAPI /query]
+
+    subgraph Security Layer
+        API --> Guard{NeMo Guardrails<br/>+ Off-Topic Patterns}
+    end
+
+    Guard -->|"🛡️ Blocked"| BlockResp[Guardrail Response]
+    BlockResp --> UI
+
+    Guard -->|"✅ Pass"| Planner
+
+    subgraph LangGraph Agent
+        Planner{Planner Node<br/>Intent Classification}
+        Planner -->|"Conversational /<br/>Clarification"| Responder
+        Planner -->|"Technical /<br/>Document Query"| Retriever
+
+        subgraph Retrieval Pipeline
+            Retriever[Retriever Node] -->|Entity-Filtered<br/>Vector Search| Qdrant[(Qdrant Cloud<br/>19K+ Vectors)]
+            Qdrant -->|Top 40 Candidates| Reranker[Jina AI Reranker v3<br/>Semantic Reranking]
+            Reranker -->|Top 8 Chunks| Responder
+        end
+
+        Responder[Responder Node<br/>LLM Answer Generation]
+    end
+
+    subgraph LLM Gateway
+        Responder -.->|Multi-Key Rotation| Portkey[Portkey Gateway<br/>4 Keys × 2 Slugs × 4 Models]
+        Planner -.->|Rate Limit Fallback| Portkey
+    end
+
     Responder --> UI
-    Responder -.-> Memory[(LangGraph Postgres Checkpointer)]
+    Responder -.->|Conversation History| Memory[(LangGraph<br/>Postgres Checkpointer)]
+
+    subgraph Evaluation Suite
+        Judge[OpenRouter 70B Judge] -.-> Metrics[RAGAS Metrics<br/>6 Experiments]
+        Metrics -.-> Dashboard[Streamlit Eval Dashboard<br/>3-Tab UI]
+    end
+
+    style Guard fill:#ff6b6b,stroke:#c0392b,color:#fff
+    style Qdrant fill:#4ecdc4,stroke:#1a535c,color:#fff
+    style Portkey fill:#a29bfe,stroke:#6c5ce7,color:#fff
+    style Memory fill:#ffeaa7,stroke:#fdcb6e,color:#333
+    style Reranker fill:#74b9ff,stroke:#0984e3,color:#fff
 ```
+
+---
+
+## Evaluation Results
+
+The pipeline is evaluated using **RAGAS** metrics with a **Meta Llama 3.3 70B** judge model via OpenRouter, across 12 golden benchmark samples from 5 SEC contract filings.
+
+| Metric | Score | Status | What It Measures |
+|:---|:---:|:---:|:---|
+| **Tool Correctness** | 1.00 |  Good | Did the pipeline call the correct tool? |
+| **🛡️ Guardrails Accuracy** | 6/6 |  Good | Off-topic/jailbreak blocking (Precision 1.00, Recall 1.00) |
+| **Context Recall** | 0.80 |  Good | Does retrieved context cover all reference information? |
+| **Context Precision** | 0.70 |  Fair | Are relevant chunks ranked at the top of results? |
+| **Faithfulness** | 0.69 |  Fair | Are answer claims supported by retrieved context? |
+
 
 ---
 
@@ -51,24 +98,28 @@ graph TD
 ```text
 ├── app/
 │   ├── agents/
-│   │   └── nodes/       # Planner, Retriever, Responder LangGraph nodes
-│   ├── gateway/         # Portkey LLM gateway — primary + fallback routing
-│   ├── guardrails/      # NeMo Guardrails input/output filtering
+│   │   └── nodes/          # Planner, Retriever, Responder LangGraph nodes
+│   ├── gateway/            # Portkey LLM gateway — multi-key rotation + fallback routing
+│   ├── guardrails/         # NeMo Guardrails + deterministic off-topic pattern filtering
 │   ├── ingestion/
-│   │   ├── chunking/    # Paragraph-based text splitter (1500 char max)
-│   │   └── loaders/     # Local parsers — PDF (pypdf), HTML, TXT, DOCX, PPTX
+│   │   ├── chunking/       # Paragraph-based text splitter (1500 char max)
+│   │   └── loaders/        # Local parsers — PDF (pypdf), HTML, TXT, DOCX, PPTX
 │   ├── services/
-│   │   └── retrieval/   # Jina AI embeddings + Qdrant / Pinecone search + Jina AI reranking
-│   ├── config.py        # Centralized environment variable management
-│   └── main.py          # FastAPI entrypoint — guardrails gate + /query endpoint
-├── evals/               # RAGAS evaluation suite + Streamlit 3-tab demo
-├── scripts/             # Collection setup, defragmentation & zero-cost cloud migration scripts
-├── ui/                  # Streamlit chat interface with reasoning step transparency
-├── processed_data/      # Auto-generated — parsed & chunked JSON output per document
-├── DOCS/                # Architectural, postmortem and operational guides
-├── DATA/                # Sample datasets (True vs Noisy documentation)
-├── Dockerfile           # Multi-stage container definition
-└── requirements.txt     # Pinned dependencies
+│   │   └── retrieval/      # Jina AI embeddings + Qdrant entity-filtered search + Jina reranking
+│   ├── config.py           # Centralized environment variable management (multi-key support)
+│   └── main.py             # FastAPI entrypoint — guardrails gate + /query endpoint
+├── evals/                  # RAGAS evaluation suite + Streamlit 3-tab demo
+│   ├── app.py              # Streamlit eval dashboard (3 steps: pipeline → guardrails → metrics)
+│   ├── metrics.py          # RAGAS metric runner (OpenRouter 70B judge + SHA-256 cache)
+│   ├── guardrails_eval.py  # Guardrails binary classification evaluator
+│   ├── golden_dataset.json # 12 RAG samples + 6 guardrails test cases
+│   └── metric_results.json # Checkpointed evaluation scores
+├── ui/                     # Streamlit chat interface with reasoning step transparency
+├── processed_data/         # Auto-generated — parsed & chunked JSON output per document
+├── DOCS/                   # Architectural, postmortem, eval changelog and operational guides
+├── DATA/                   # Sample datasets (True vs Noisy documentation)
+├── Dockerfile              # Multi-stage container definition
+└── requirements.txt        # Pinned dependencies
 ```
 
 ---
@@ -78,16 +129,16 @@ graph TD
 | Layer | Technology |
 |-------|-----------|
 | Orchestration | LangChain + LangGraph |
-| LLMs | Kimi + Llama/Gemini fallback via **Portkey** gateway |
-| Guardrails | NeMo Guardrails |
-| Vector DB | **Qdrant Cloud (Managed SaaS)** / Pinecone (Fallback) |
-| Reranking | Jina AI Reranker API (`jina-reranker-v3`) |
+| LLMs | Groq (gpt-oss-120b / llama-3.3-70b) via **Portkey** gateway (4-key rotation) |
+| Guardrails | NeMo Guardrails + Deterministic Pattern Filtering |
+| Vector DB | **Qdrant Cloud (Managed SaaS)** with entity-aware filtering / Pinecone (Fallback) |
+| Reranking | Jina AI Reranker API (`jina-reranker-v3`) — top 40 → top 8 |
 | Embeddings | Jina AI `jina-embeddings-v3` (1024-dim) + local mxbai fallback |
 | Document Parsing | pypdf + pdfplumber (local, no OCR service) |
 | Persistence | Neon Serverless Postgres (LangGraph checkpointer) |
 | Rate Limiting | Upstash Redis |
 | Observability | Pydantic Logfire + LangSmith |
-| Evaluation | RAGAS + custom Tool Correctness (Jaccard) |
+| Evaluation | RAGAS (6 metrics) + OpenRouter Meta Llama 3.3 70B Judge |
 
 ---
 
@@ -109,9 +160,15 @@ Create a `.env` file with the following keys:
 # OpenAI LLM
 OPENAI_API_KEY = "your-openai-api-key"
 
-# LLM Gateway
+# LLM Gateway — Multi-Key Portkey Rotation
 PORTKEY_API_KEY = "your-portkey-api-key"
+PORTKEY_API_KEY_1 = "your-portkey-key-2"
+PORTKEY_API_KEY_2 = "your-portkey-key-3"
+PORTKEY_API_KEY_3 = "your-portkey-key-4"
 PORTKEY_PRIMARY_CONFIG_ID = "pc-xxxxxxxxxxxxxxxx"
+
+# OpenRouter (Evaluation Judge)
+OPEN_ROUTER_KEY = "sk-or-v1-..."
 
 # Jina AI Embeddings + Reranker API
 JINA_API_KEY = "your-jina-api-key"
@@ -140,9 +197,6 @@ LANGSMITH_API_KEY = "..."
 LANGSMITH_PROJECT = "enterprise_rag"
 LANGSMITH_TRACING = true
 LANGSMITH_ENDPOINT = https://api.smith.langchain.com
-
-# Evals
-JUDGE_OPENAI_API_KEY = "..."
 
 # Backend (for Streamlit UI)
 BACKEND_URL = "http://localhost:8000"
@@ -180,6 +234,7 @@ DEST_QDRANT_URL="https://your-cluster-id.gcp.cloud.qdrant.io:6333" DEST_QDRANT_A
 > 📖 **Architecture & Deep Dive Documentation**:
 > - [Qdrant Failure Postmortem & Cloud Migration Architecture](DOCS/QDRANT_FAILURE_POSTMORTEM_AND_MIGRATION.md)
 > - [Qdrant Optimization & Troubleshooting Guide](DOCS/QDRANT_OPTIMIZATION.md)
+> - [Evaluation Pipeline Changelog](DOCS/EVAL_PIPELINE_CHANGELOG.md)
 
 ---
 
@@ -234,36 +289,40 @@ streamlit run ui/dashboard.py
 
 ### 5. Query the API
 
-```powershell
-curl -X POST "http://localhost:8000/query" `
-  -H "Content-Type: application/json" `
-  -d '{"q": "How do I start Redis for a Contracts work queue?", "thread_id": "user-1"}'
+```bash
+curl -X POST "http://localhost:8000/query" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_RAG_API_KEY" \
+  -d '{"q": "What are the parties in the Inmode manufacturing agreement?", "thread_id": "user-1"}'
 
 # Response: {"question": "...", "answer": "...", "thought_process": [...], "status": "...", "sources": [...]}
 ```
 
 ### 6. Run the eval suite
 
-```powershell
-# Headless CLI runner (requires backend on :8000)
-python -m evals.run_evals
+```bash
+# Headless CLI runner — prints final summary table (no Streamlit needed)
+python scripts/run_complete_eval_and_summary.py
 
-# Or use the Streamlit demo
+# Or use the Streamlit 3-tab eval dashboard
 streamlit run evals/app.py
+
+# Or the legacy headless runner
+python -m evals.run_evals
 ```
 
 ### 7. Run tests locally
 
-```powershell
+```bash
 # Lint + format checks
 ruff check app tests evals
 ruff format --check app tests evals
 
 # Unit tests
-$env:LOGFIRE_IGNORE_NO_CONFIG=1
-pytest tests/
+LOGFIRE_IGNORE_NO_CONFIG=1 pytest tests/
 ```
 
 ---
 
 *Built for High-Scale Enterprise Document Intelligence.*
+

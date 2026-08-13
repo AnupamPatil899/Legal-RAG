@@ -3,7 +3,7 @@ from tenacity import before_sleep_log, retry, stop_after_attempt, wait_exponenti
 
 from app.agents.state import AgentState
 from app.config import settings
-from app.gateway import extract_cache_status, portkey_client
+from app.gateway import extract_cache_status
 
 
 def generate_node(state: AgentState):
@@ -46,10 +46,16 @@ def generate_node(state: AgentState):
                 break
 
         prompt = f"""
-        You are a Senior Technical Architect.
-        Answer the question using the TECHNICAL CONTEXT provided.
+        You are a Senior Legal Contract Specialist.
+        Answer the user's question accurately and directly using ONLY the CONTRACT CONTEXT provided below.
 
-        TECHNICAL CONTEXT:
+        GUIDELINES:
+        1. Base your answer strictly on the relevant clauses, numbers, standards (e.g. ISO standards), party names, and terms in the CONTRACT CONTEXT.
+        2. Identify the contract and parties when stating obligations or terms.
+        3. Be clear, direct, and concise. Do not include unnecessary disclaimers if the answer is present in the context.
+        4. If the context does not contain enough information to answer the question, state that clearly.
+
+        CONTRACT CONTEXT:
         {full_context}
 
         CONVERSATION HISTORY:
@@ -94,9 +100,42 @@ def generate_node(state: AgentState):
     before_sleep=before_sleep_log(logfire, "warning"),
 )
 def _generate_response(prompt: str):
-    """Call the LLM gateway with retry logic for transient failures."""
-    slug = settings.PORTKEY_PRIMARY_SLUG.strip()
-    return portkey_client.chat.completions.create(
-        model=f"@{slug}/llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}],
-    )
+    """Call the LLM gateway with multi-key, multi-slug, and multi-model fallbacks."""
+    from openai import OpenAI
+
+    from app.gateway.client import PORTKEY_GATEWAY_URL, _make_headers, get_all_portkey_keys, get_all_portkey_slugs
+
+    keys = get_all_portkey_keys()
+    slugs = get_all_portkey_slugs()
+
+    primary_model = (settings.LLM_MODEL or "openai/gpt-oss-120b").strip()
+    candidate_models = [primary_model]
+    for alt in ("openai/gpt-oss-20b", "llama-3.3-70b-versatile", "llama-3.1-8b-instant"):
+        if alt not in candidate_models:
+            candidate_models.append(alt)
+
+    last_err = None
+    for api_key in keys:
+        for slug in slugs:
+            headers = _make_headers("responder", api_key=api_key)
+            client = OpenAI(api_key=api_key, base_url=PORTKEY_GATEWAY_URL, default_headers=headers)
+            for model_name in candidate_models:
+                try:
+                    full_model = model_name if model_name.startswith("@") else f"@{slug}/{model_name}"
+                    return client.chat.completions.create(
+                        model=full_model,
+                        messages=[{"role": "user", "content": prompt}],
+                    )
+                except Exception as e:
+                    last_err = e
+                    err_str = str(e).lower()
+                    if "429" in err_str or "rate limit" in err_str or "quota" in err_str:
+                        logfire.warning(
+                            f"⚠️ Model '{model_name}' on key ...{api_key[-4:]} rate-limited. Trying fallback..."
+                        )
+                        continue
+                    else:
+                        logfire.warning(f"⚠️ Portkey '{full_model}' failed: {e}. Trying next...")
+                        continue
+
+    raise last_err or RuntimeError("All Portkey keys, slugs and models failed.")

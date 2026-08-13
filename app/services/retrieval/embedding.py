@@ -68,12 +68,8 @@ def _init():
     if _active_model is not None or _model_type is not None:
         return
 
-    if _probe_jina_api():
-        _active_model = None  # Jina API is stateless; no local model to keep
-        _model_type = "jina"
-    else:
-        _active_model = _load_fallback()
-        _model_type = "fallback"
+    _active_model = _load_fallback()
+    _model_type = "fallback"
 
 
 # ── Public helpers ─────────────────────────────────────────────────────────────
@@ -89,13 +85,13 @@ def get_embedding_dim() -> int:
 
 
 @retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=1, max=5),
+    stop=stop_after_attempt(5),
+    wait=wait_exponential(multiplier=2, min=2, max=20),
     reraise=True,
-    # before_sleep=before_sleep_log(logfire, "warning"),
 )
 def _embed_jina_batch(texts: list[str], task: str) -> list[list[float]]:
-    """Call the Jina Embeddings API for a single batch."""
+    """Call the Jina Embeddings API for a single batch with rate-limit pacing."""
+
     response = requests.post(
         _JINA_EMBEDDING_URL,
         headers={
@@ -131,23 +127,22 @@ def _embed_jina(texts: list[str], task: str) -> list[list[float]]:
     return all_embeddings
 
 
-# ── Fallback embedding ─────────────────────────────────────────────────────────
-
-
-def _embed_fallback_batch(texts: list[str]) -> list[list[float]]:
+def _embed_fallback_batch(texts: list[str], is_query: bool = False) -> list[list[float]]:
     """Embed texts using the local mxbai model."""
-    embeddings = _active_model.encode(texts, show_progress_bar=False)
+    if is_query:
+        formatted = [f"Represent this sentence for searching relevant passages: {t}" for t in texts]
+    else:
+        formatted = texts
+    embeddings = _active_model.encode(formatted, show_progress_bar=False, normalize_embeddings=True)
     return embeddings.tolist()
 
 
-def _embed_fallback(texts: list[str]) -> list[list[float]]:
+def _embed_fallback(texts: list[str], is_query: bool = False) -> list[list[float]]:
     """Embed texts via the local fallback model in batches."""
     all_embeddings: list[list[float]] = []
     for i in range(0, len(texts), BATCH_SIZE):
         batch = texts[i : i + BATCH_SIZE]
-        # with logfire.span("Embed batch via fallback model", start=i, size=len(batch)):
-        if 2 > 1:
-            all_embeddings.extend(_embed_fallback_batch(batch))
+        all_embeddings.extend(_embed_fallback_batch(batch, is_query=is_query))
     return all_embeddings
 
 
@@ -158,13 +153,12 @@ def _ensure_fallback():
     """Switch to the local fallback model if not already active."""
     global _active_model, _model_type
     if _model_type != "fallback":
-        # logfire.warning("Switching to local fallback embeddings.")
-        print("Switching to local fallback embeddings.")
+        print("Using local mxbai-embed-large-v1 embeddings (1024-dim).")
         _active_model = _load_fallback()
         _model_type = "fallback"
 
 
-def _embed(texts: list[str], task: str) -> list[list[float]]:
+def _embed(texts: list[str], task: str, is_query: bool = False) -> list[list[float]]:
     """Embed texts using the active provider, falling back to local on failure."""
     _init()
 
@@ -172,21 +166,20 @@ def _embed(texts: list[str], task: str) -> list[list[float]]:
         try:
             return _embed_jina(texts, task)
         except Exception as e:
-            # logfire.error(f"Jina Embeddings API failed: {e}. Falling back to local model.")
-            print(f"Jina Embeddings API failed: {e}. Falling back to local model.")
+            print(f"Jina Embeddings API note: {e}. Switching to mxbai model.")
             _ensure_fallback()
 
-    return _embed_fallback(texts)
+    return _embed_fallback(texts, is_query=is_query)
 
 
-# ── Public API (same signatures as before) ─────────────────────────────────────
+# ── Public API ─────────────────────────────────────────────────────────────────
 
 
 def embed_query(query: str) -> list[float]:
-    """Embed a single query."""
-    return _embed([query], task="retrieval.query")[0]
+    """Embed a single query with mxbai search instruction prefix."""
+    return _embed([query], task="retrieval.query", is_query=True)[0]
 
 
 def embed_texts(texts: list[str]) -> list[list[float]]:
     """Embed a list of document texts."""
-    return _embed(texts, task="retrieval.passage")
+    return _embed(texts, task="retrieval.passage", is_query=False)

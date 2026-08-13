@@ -21,15 +21,28 @@ print(os.getenv("LOGFIRE_TOKEN"))
 # ─────────────────────────────────────────────────────────────────────────────
 import asyncio
 
+try:
+    asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())
+except Exception:
+    pass
+
 import nest_asyncio
 import pandas as pd
 import streamlit as st
 
-nest_asyncio.apply()
+try:
+    nest_asyncio.apply()
+except Exception:
+    pass
+
 
 from evals.guardrails_eval import compute_guardrails_metrics, run_guardrails_eval
-from evals.metrics import run_all_metrics
-from evals.pipeline import load_golden_dataset, run_pipeline
+from evals.metrics import (
+    clear_metrics_checkpoint,
+    load_metrics_checkpoint,
+    run_all_metrics,
+)
+from evals.pipeline import load_golden_dataset, run_pipeline, save_results
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Page config
@@ -80,7 +93,7 @@ def _render_metric_table(df: pd.DataFrame, metric_col: str, title: str):
     avg = df[metric_col].mean()
     st.markdown(f"**{title}** — AVG: {_badge(avg)} `{avg:.2f}` {_grade(avg)}")
     styled = df.style.applymap(_color_score, subset=[metric_col]).format({metric_col: "{:.3f}"})
-    st.dataframe(styled, use_container_width=True, hide_index=True)
+    st.dataframe(styled, width="stretch", hide_index=True)
 
 
 def _run_async(coro):
@@ -91,20 +104,38 @@ def _run_async(coro):
 # ─────────────────────────────────────────────────────────────────────────────
 # Session state init
 # ─────────────────────────────────────────────────────────────────────────────
-if "golden" not in st.session_state:
-    st.session_state.golden = load_golden_dataset()
+golden = load_golden_dataset()
+st.session_state.golden = golden
+
+rag_completed = sum(
+    1
+    for s in golden.get("rag_samples", [])
+    if bool(
+        s.get("actual_response") and s.get("actual_response").strip() and not s.get("actual_response").startswith("⚠️")
+    )
+)
+total_rag = len(golden.get("rag_samples", []))
+
+guardrails_completed = sum(
+    1
+    for g in golden.get("guardrails_samples", [])
+    if g.get("actual_blocked") is not None and g.get("result") in ["TP", "TN", "FP", "FN"]
+)
+total_guardrails = len(golden.get("guardrails_samples", []))
+
+has_saved_responses = rag_completed > 0
+
 if "pipeline_done" not in st.session_state:
-    st.session_state.pipeline_done = False
-if "enriched_dataset" not in st.session_state:
-    st.session_state.enriched_dataset = None
-if "guardrails_results" not in st.session_state:
-    st.session_state.guardrails_results = None
+    st.session_state.pipeline_done = has_saved_responses
+if "enriched_dataset" not in st.session_state or st.session_state.enriched_dataset is None:
+    st.session_state.enriched_dataset = golden if has_saved_responses else None
+if "guardrails_results" not in st.session_state or st.session_state.guardrails_results is None:
+    st.session_state.guardrails_results = golden.get("guardrails_samples") if guardrails_completed > 0 else None
 if "metric_results" not in st.session_state:
-    st.session_state.metric_results = None
+    saved_mr = load_metrics_checkpoint()
+    st.session_state.metric_results = saved_mr if saved_mr else None
 if "pipeline_rows" not in st.session_state:
     st.session_state.pipeline_rows = []
-
-golden = st.session_state.golden
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Header
@@ -141,7 +172,7 @@ with tab1:
             }
         )
     df_golden = pd.DataFrame(rag_rows)
-    st.dataframe(df_golden, use_container_width=True, hide_index=True)
+    st.dataframe(df_golden, width="stretch", hide_index=True)
     st.caption(f"✅ {len(rag_rows)} golden RAG samples from 5 enterprise docs")
 
     st.divider()
@@ -164,7 +195,7 @@ with tab1:
                 "Description": g["description"],
             }
         )
-    st.dataframe(pd.DataFrame(g_rows), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(g_rows), width="stretch", hide_index=True)
     st.caption("6 guardrails test cases: 3 adversarial (should block) + 3 legit (should pass)")
 
     with st.expander("View raw golden_dataset.json"):
@@ -179,27 +210,42 @@ with tab2:
     st.markdown(
         "Sends each golden question to your **running FastAPI app** (`localhost:8000/query`). "
         "Captures the actual response, retrieved contexts, and tool called. "
-        "Responses are truncated to 300 chars to save tokens for the RAGAS judging step."
-    )
-    st.info(
-        "⚠️ Make sure your FastAPI backend is running first: `uvicorn app.main:app --reload --port 8000`",
-        icon="⚠️",
+        "Results are **incrementally saved to disk after every question & guardrail test**."
     )
 
-    col_p1, col_p2, col_p3 = st.columns([1, 1, 2])
+    if rag_completed > 0 or guardrails_completed > 0:
+        st.info(
+            f"💾 **Current Progress on Disk**: `{rag_completed}/{total_rag}` RAG queries and `{guardrails_completed}/{total_guardrails}` Guardrails tests completed. "
+            "Click **'▶️ Run / Resume Live Pipeline'** to resume from the next unanswered question (already completed items are instantly skipped with 0 API calls).",
+            icon="ℹ️",
+        )
+    else:
+        st.info(
+            "⚠️ Make sure your FastAPI backend is running first: `uvicorn app.main:app --reload --port 8000`",
+            icon="⚠️",
+        )
+
+    col_p1, col_p2, col_p3 = st.columns([1, 1, 1])
     run_pipeline_btn = col_p1.button(
-        "▶️ Run Live Pipeline",
+        "▶️ Run / Resume Live Pipeline",
         type="primary",
         width="stretch",
-        disabled=st.session_state.pipeline_done,
     )
     reset_btn = col_p2.button(
-        "🔄 Reset & Re-run",
+        "🔄 Reset Everything & Start From Scratch",
         width="stretch",
-        disabled=not st.session_state.pipeline_done,
     )
 
     if reset_btn:
+        for s in st.session_state.golden.get("rag_samples", []):
+            s["actual_response"] = ""
+            s["actual_contexts"] = []
+            s["actual_tools_called"] = []
+        for g in st.session_state.golden.get("guardrails_samples", []):
+            g["actual_blocked"] = None
+            g["result"] = None
+        save_results(st.session_state.golden, os.path.join(os.path.dirname(__file__), "golden_dataset.json"))
+        clear_metrics_checkpoint()
         st.session_state.pipeline_done = False
         st.session_state.enriched_dataset = None
         st.session_state.guardrails_results = None
@@ -217,6 +263,29 @@ with tab2:
             pct = int((i / total) * 100)
             if stage == "calling":
                 progress_bar.progress(pct, text=f"[{i + 1}/{total}] Calling /query: {question[:60]}...")
+            elif stage == "cooldown":
+                progress_bar.progress(pct, text=question)
+                status_slot.info(question)
+            elif stage == "cached":
+                short_q = question[:55] + "..." if len(question) > 55 else question
+                short_r = response[:80] + "..." if len(response) > 80 else response
+                st.session_state.pipeline_rows.append(
+                    {
+                        "#": i + 1,
+                        "Question": short_q,
+                        "Live Response (truncated)": short_r,
+                        "Status": "⏩ Saved",
+                    }
+                )
+                live_table_slot.dataframe(
+                    pd.DataFrame(st.session_state.pipeline_rows),
+                    width="stretch",
+                    hide_index=True,
+                )
+                progress_bar.progress(
+                    int(((i + 1) / total) * 100),
+                    text=f"[{i + 1}/{total}] ⏩ Reusing saved response...",
+                )
             else:
                 short_q = question[:55] + "..." if len(question) > 55 else question
                 short_r = response[:80] + "..." if len(response) > 80 else response
@@ -230,7 +299,7 @@ with tab2:
                 )
                 live_table_slot.dataframe(
                     pd.DataFrame(st.session_state.pipeline_rows),
-                    use_container_width=True,
+                    width="stretch",
                     hide_index=True,
                 )
                 progress_bar.progress(
@@ -239,7 +308,7 @@ with tab2:
                 )
 
         with logfire.span("🚀 Streamlit — Run Pipeline Button"):
-            enriched = run_pipeline(golden, progress_callback=pipeline_cb)
+            enriched = run_pipeline(golden, progress_callback=pipeline_cb, force_refresh=True)
             st.session_state.enriched_dataset = enriched
 
         progress_bar.progress(100, text="✅ All responses collected!")
@@ -251,14 +320,32 @@ with tab2:
         g_progress = st.progress(0, text="Running guardrails tests...")
         g_status_slot = st.empty()
 
-        def g_cb(i, total, input_text):
-            g_progress.progress(
-                int((i / total) * 100),
-                text=f"[{i + 1}/{total}] Testing: {input_text[:60]}...",
-            )
+        def g_cb(i, total, input_text, stage="calling"):
+            pct = int((i / total) * 100)
+            if stage == "cooldown":
+                g_progress.progress(pct, text=input_text)
+                g_status_slot.info(input_text)
+            elif stage == "cached":
+                g_progress.progress(
+                    int(((i + 1) / total) * 100),
+                    text=f"[{i + 1}/{total}] ⏩ Reusing saved guardrail result...",
+                )
+            else:
+                g_progress.progress(
+                    pct,
+                    text=f"[{i + 1}/{total}] Testing: {input_text[:60]}...",
+                )
 
         with logfire.span("🛡️ Streamlit — Guardrails Tests"):
-            g_results = run_guardrails_eval(enriched["guardrails_samples"], progress_callback=g_cb)
+            g_results = run_guardrails_eval(
+                enriched["guardrails_samples"],
+                progress_callback=g_cb,
+                checkpoint_path=os.path.join(os.path.dirname(__file__), "golden_dataset.json"),
+                full_dataset=enriched,
+                force_refresh=True,
+            )
+            enriched["guardrails_samples"] = g_results
+            save_results(enriched, os.path.join(os.path.dirname(__file__), "golden_dataset.json"))
             g_metrics = compute_guardrails_metrics(g_results)
             st.session_state.guardrails_results = g_results
             st.session_state.pipeline_done = True
@@ -282,7 +369,7 @@ with tab2:
                     "Result": result_label,
                 }
             )
-        st.dataframe(pd.DataFrame(g_rows_live), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(g_rows_live), width="stretch", hide_index=True)
 
         mc1, mc2, mc3, mc4 = st.columns(4)
         mc1.metric("Correct", f"{g_metrics['correct']}/{g_metrics['total']}")
@@ -307,7 +394,7 @@ with tab2:
                     "Contexts Retrieved": len(s.get("actual_contexts", [])),
                 }
             )
-        st.dataframe(pd.DataFrame(resp_rows), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(resp_rows), width="stretch", hide_index=True)
 
         if st.session_state.guardrails_results:
             st.divider()
@@ -327,7 +414,7 @@ with tab2:
                         "Result": result_label,
                     }
                 )
-            st.dataframe(pd.DataFrame(g_rows_prev), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(g_rows_prev), width="stretch", hide_index=True)
             gm = compute_guardrails_metrics(st.session_state.guardrails_results)
             mc1, mc2, mc3, mc4 = st.columns(4)
             mc1.metric("Correct", f"{gm['correct']}/{gm['total']}")
@@ -347,21 +434,27 @@ with tab3:
     else:
         st.markdown(
             "Runs all **6 metric experiments** on the stored responses. "
-            "LLM-based metrics use `JUDGE_OPENAI_API_KEY` — samples are scored one at a time "
-            "with 40s cooldowns between samples as a conservative rate-limit buffer. "
-            "Total runtime: ~50 min."
-        )
-        st.info(
-            "Token key used: `JUDGE_OPENAI_API_KEY` (separate from production key). "
-            "Each sample is processed individually to stay within OpenAI rate limits.",
-            icon="ℹ️",
+            "Results are automatically **checkpointed after every single sample and experiment stage**. "
+            "If an error occurs or Streamlit is refreshed, evaluation automatically resumes from the last completed stage."
         )
 
-        run_metrics_btn = st.button(
-            "▶️ Run Eval Metrics",
+        col_m1, col_m2 = st.columns([1, 1])
+        run_metrics_btn = col_m1.button(
+            "▶️ Run / Resume Eval Metrics",
             type="primary",
+            width="stretch",
             disabled=not st.session_state.pipeline_done,
         )
+        reset_metrics_btn = col_m2.button(
+            "🔄 Reset & Recompute Metrics",
+            width="stretch",
+            disabled=not st.session_state.pipeline_done,
+        )
+
+        if reset_metrics_btn:
+            clear_metrics_checkpoint()
+            st.session_state.metric_results = None
+            st.rerun()
 
         if run_metrics_btn:
             status_slot = st.empty()
@@ -393,7 +486,7 @@ with tab3:
                         _render_metric_table(metric_results[key], key, title)
 
         elif st.session_state.metric_results:
-            st.success("✅ Metrics already computed. Showing results below.")
+            st.success("✅ Metrics loaded from saved checkpoint. Showing results below.")
             metric_display_names = {
                 "faithfulness": "Exp 1 — Faithfulness",
                 "answer_relevancy": "Exp 2 — Answer Relevancy",

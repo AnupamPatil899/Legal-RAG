@@ -1,13 +1,13 @@
 import os
 import sys
 import time
+
 from dotenv import load_dotenv
+from qdrant_client import QdrantClient
+from qdrant_client.models import Distance, PointStruct, VectorParams
 
 # Load environment variables
 load_dotenv()
-
-from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, PointStruct, VectorParams
 
 # ==========================================
 # 1. Configuration Settings
@@ -19,15 +19,8 @@ SOURCE_API_KEY = os.getenv("SOURCE_QDRANT_API_KEY") or os.getenv("QDRANT_SECURIT
 SOURCE_COLLECTION = os.getenv("SOURCE_COLLECTION") or os.getenv("QDRANT_COLLECTION") or "enterprise_rag_v1"
 
 # Destination (Qdrant Cloud)
-DEST_URL = (
-    os.getenv("DEST_QDRANT_URL")
-    or os.getenv("QDRANT_CLOUD_URL")
-    or os.getenv("QDRANT_CLUSTER_ENDPOINT")
-)
-DEST_API_KEY = (
-    os.getenv("DEST_QDRANT_API_KEY")
-    or os.getenv("QDRANT_CLOUD_API_KEY")
-)
+DEST_URL = os.getenv("DEST_QDRANT_URL") or os.getenv("QDRANT_CLOUD_URL") or os.getenv("QDRANT_CLUSTER_ENDPOINT")
+DEST_API_KEY = os.getenv("DEST_QDRANT_API_KEY") or os.getenv("QDRANT_CLOUD_API_KEY")
 DEST_COLLECTION = os.getenv("DEST_COLLECTION") or SOURCE_COLLECTION
 
 # Vector Dimension (1024 for jina-embeddings-v3 / mxbai-embed-large-v1)
@@ -73,11 +66,11 @@ def main():
             check_compatibility=False,
             timeout=120,
         )
-        
+
         # Check source collections
         collections = [c.name for c in source_client.get_collections().collections]
         print(f"   Available Source Collections: {collections}")
-        
+
         target_src = SOURCE_COLLECTION
         if target_src not in collections:
             if len(collections) == 1:
@@ -93,7 +86,7 @@ def main():
     except Exception as e:
         print(f"❌ Failed to connect to Source Qdrant at '{SOURCE_URL}': {e}")
         print("\n💡 TIP: If your source Docker is running on another port or host, pass it via:")
-        print("   SOURCE_QDRANT_URL=\"http://<IP>:6333\" python scripts/migrate_to_qdrant_cloud.py")
+        print('   SOURCE_QDRANT_URL="http://<IP>:6333" python scripts/migrate_to_qdrant_cloud.py')
         sys.exit(1)
 
     if total_points == 0:
@@ -127,7 +120,7 @@ def main():
         print(f"✅ Created collection '{DEST_COLLECTION}' on Qdrant Cloud.")
 
     print(f"\n📦 [4/5] Transferring {total_points:,} points (Vectors + Payloads) with ZERO API costs...")
-    
+
     next_offset = None
     transferred = 0
     batch_num = 0
@@ -146,10 +139,7 @@ def main():
             break
 
         # Convert to PointStruct format
-        points_to_upsert = [
-            PointStruct(id=r.id, vector=r.vector, payload=r.payload)
-            for r in records
-        ]
+        points_to_upsert = [PointStruct(id=r.id, vector=r.vector, payload=r.payload) for r in records]
 
         # Upsert directly into Qdrant Cloud
         dest_client.upsert(
@@ -170,19 +160,21 @@ def main():
     print("\n🔍 [5/5] Verifying Qdrant Cloud Indexing & Health Status...")
     for attempt in range(15):
         dest_info = dest_client.get_collection(DEST_COLLECTION)
-        print(f"   Status: {dest_info.status} | Points: {dest_info.points_count:,} | Indexed Vectors: {dest_info.indexed_vectors_count:,}")
+        print(
+            f"   Status: {dest_info.status} | Points: {dest_info.points_count:,} | Indexed Vectors: {dest_info.indexed_vectors_count:,}"
+        )
         if dest_info.status.name.lower() == "green" and dest_info.indexed_vectors_count == dest_info.points_count:
             break
         time.sleep(2)
 
     final_info = dest_client.get_collection(DEST_COLLECTION)
     print("\n" + "=" * 65)
-    print(f"🎉 MIGRATION SUCCESSFUL!")
+    print("🎉 MIGRATION SUCCESSFUL!")
     print(f"   Target Collection: {DEST_COLLECTION}")
     print(f"   Final Status:      {final_info.status}")
     print(f"   Total Points:      {final_info.points_count:,}")
     print(f"   Indexed Vectors:   {final_info.indexed_vectors_count:,}")
-    print(f"   Embedding Credits: 0 (Zero API credits used)")
+    print("   Embedding Credits: 0 (Zero API credits used)")
     print("=" * 65)
     print("\n👉 NEXT STEP: Update your .env to point to Qdrant Cloud:")
     print(f"   QDRANT_URL={DEST_URL}")

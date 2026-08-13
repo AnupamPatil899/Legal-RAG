@@ -24,14 +24,23 @@ class Settings(BaseSettings):
     # --- JINA AI (embeddings + reranker) ---
     JINA_API_KEY: str | None = None
 
-    # --- OPENAI LLM ---
+    # --- OPENAI & OPENROUTER LLM ---
     OPENAI_API_KEY: str | None = None
     JUDGE_OPENAI_API_KEY: str | None = None
+    OPEN_ROUTER_KEY: str | None = None
+    OPENROUTER_API_KEY: str | None = None
 
     # --- PORTKEY LLM GATEWAY ---
     PORTKEY_API_KEY: str | None = None
+    PORTKEY_API_KEY_1: str | None = None
+    PORTKEY_API_KEY_2: str | None = None
+    PORTKEY_API_KEY_3: str | None = None
     PORTKEY_PRIMARY_SLUG: str = "rag"
     PORTKEY_FALLBACK_SLUG: str = "brag"
+    LLM_MODEL: str = Field(
+        default="openai/gpt-oss-120b",
+        validation_alias=AliasChoices("LLM_MODEL", "PORTKEY_MODEL", "MODEL_NAME"),
+    )
     # Portkey saved config is referenced by its system-generated `pc-...` ID.
     # Required when block_inline_config is enabled on the workspace.
     PORTKEY_PRIMARY_CONFIG_ID: str | None = None
@@ -62,7 +71,7 @@ class Settings(BaseSettings):
 
     # --- API SAFETY ---
     API_KEY: str | None = Field(default=None, alias="RAG_API_KEY")
-    RATE_LIMIT_PER_MINUTE: int = 20
+    RATE_LIMIT_PER_MINUTE: int = 120
     STRICT_STARTUP: bool = False
 
     # --- OBSERVABILITY ---

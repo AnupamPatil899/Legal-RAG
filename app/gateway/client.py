@@ -12,9 +12,36 @@ from app.config import settings
 #     retry/fallback/cache behavior must be configured inside the Portkey UI.
 
 
-def _make_headers(feature: str = "rag") -> dict:
+def get_all_portkey_keys() -> list[str]:
+    keys = []
+    for k in (
+        settings.PORTKEY_API_KEY,
+        settings.PORTKEY_API_KEY_1,
+        settings.PORTKEY_API_KEY_2,
+        settings.PORTKEY_API_KEY_3,
+    ):
+        if k and k.strip() and k.strip() not in keys:
+            keys.append(k.strip())
+    return keys if keys else ["dummy"]
+
+
+def get_all_portkey_slugs() -> list[str]:
+    slugs = []
+    for s in (
+        settings.PORTKEY_PRIMARY_SLUG,
+        settings.PORTKEY_FALLBACK_SLUG,
+        "rag",
+        "brag",
+    ):
+        if s and s.strip() and s.strip() not in slugs:
+            slugs.append(s.strip())
+    return slugs if slugs else ["rag"]
+
+
+def _make_headers(feature: str = "rag", api_key: str | None = None) -> dict:
     """Build Portkey headers that reference the primary saved config by ID."""
     config_id = (settings.PORTKEY_PRIMARY_CONFIG_ID or "").strip()
+    active_key = (api_key or settings.PORTKEY_API_KEY or "").strip()
     if not config_id:
         raise ValueError(
             "PORTKEY_PRIMARY_CONFIG_ID is not set in .env. "
@@ -22,7 +49,7 @@ def _make_headers(feature: str = "rag") -> dict:
             "run: PYTHONPATH=. python scripts/list_portkey_configs.py"
         )
     return createHeaders(
-        api_key=settings.PORTKEY_API_KEY.strip(),
+        api_key=active_key,
         config_id=config_id,
         metadata={
             "feature": feature.strip(),
@@ -33,11 +60,8 @@ def _make_headers(feature: str = "rag") -> dict:
 
 
 # OpenAI-compatible client routed through Portkey.
-# We use the OpenAI SDK directly because the native Portkey SDK does not
-# surface a first-class config_id constructor parameter; the header-based
-# approach works reliably with block_inline_config enabled.
 portkey_client = OpenAI(
-    api_key=settings.PORTKEY_API_KEY.strip(),
+    api_key=settings.PORTKEY_API_KEY.strip() if settings.PORTKEY_API_KEY else "dummy",
     base_url=PORTKEY_GATEWAY_URL,
     default_headers=_make_headers(),
 )
@@ -54,10 +78,12 @@ def get_langchain_llm(feature: str = "rag") -> ChatOpenAI:
       upstream provider's own client does not understand it. Portkey is just in the middle.
     """
     slug = settings.PORTKEY_PRIMARY_SLUG.strip()
+    model_name = (settings.LLM_MODEL or "openai/gpt-oss-120b").strip()
+    full_model = model_name if model_name.startswith("@") else f"@{slug}/{model_name}"
     return ChatOpenAI(
         api_key=settings.PORTKEY_API_KEY.strip(),
         base_url=PORTKEY_GATEWAY_URL,
-        model=f"@{slug}/llama-3.3-70b-versatile",
+        model=full_model,
         default_headers=_make_headers(feature),
     )
 

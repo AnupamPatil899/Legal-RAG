@@ -57,7 +57,10 @@ def test_run_pipeline_populates_actual_response():
         "sources": ["ctx1"],
     }
 
-    with patch.object(pipeline_mod.requests, "post", return_value=post_resp) as mock_post:
+    with (
+        patch.object(pipeline_mod.requests, "post", return_value=post_resp) as mock_post,
+        patch.object(pipeline_mod, "save_results"),
+    ):
         result = run_pipeline(golden, progress_callback=None)
 
     sample = result["rag_samples"][0]

@@ -5,7 +5,6 @@ from urllib.parse import urlparse
 import requests
 from dotenv import load_dotenv
 from pinecone import Pinecone
-from pinecone_text.sparse import BM25Encoder
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 # Patch Pinecone's check_realistic_host to support custom/docker hostnames (e.g. 'pinecone-local') without dots
@@ -25,7 +24,7 @@ except (ImportError, AttributeError):
 
 
 from qdrant_client import QdrantClient
-from qdrant_client.models import FieldCondition, Filter, MatchValue
+from qdrant_client.models import FieldCondition, Filter, MatchText, MatchValue
 
 from app.config import settings
 from app.services.retrieval.embedding import embed_query
@@ -34,7 +33,12 @@ load_dotenv()
 
 
 def get_qdrant_client():
-    url = getattr(settings, "QDRANT_URL", None) or os.getenv("QDRANT_URL")
+    url = (
+        getattr(settings, "QDRANT_URL", None)
+        or getattr(settings, "QDRANT_CLUSTER_ENDPOINT", None)
+        or os.getenv("QDRANT_CLUSTER_ENDPOINT")
+        or os.getenv("QDRANT_URL")
+    )
     if not url:
         return None
     if url.startswith("https://") and ":" not in url[8:]:
@@ -91,7 +95,7 @@ def get_pinecone_index(pc_client: Pinecone, index_name: str = None):
     return pc_client.Index(index_name)
 
 
-# Initialize Pinecone Client & BM25 Encoder
+# Initialize Pinecone Client (lazy BM25)
 _pinecone_api_key = getattr(settings, "PINECONE_API_KEY", None) or os.getenv("PINECONE_API_KEY") or "pclocal"
 _pinecone_host = getattr(settings, "PINECONE_HOST", None) or os.getenv("PINECONE_HOST")
 
@@ -100,44 +104,188 @@ if _pinecone_host:
     _pc_kwargs["host"] = _pinecone_host
 
 client = Pinecone(**_pc_kwargs) if (_pinecone_api_key or _pinecone_host) else None
-bm25 = BM25Encoder.default()
+
+
+class _LazyBM25:
+    def __init__(self):
+        self._instance = None
+
+    def _get(self):
+        if self._instance is None:
+            try:
+                from pinecone_text.sparse import BM25Encoder
+
+                self._instance = BM25Encoder.default()
+            except Exception:
+                self._instance = None
+        return self._instance
+
+    def encode_queries(self, query: str):
+        inst = self._get()
+        if inst:
+            return inst.encode_queries(query)
+        return None
+
+    def encode_documents(self, docs):
+        inst = self._get()
+        if inst:
+            return inst.encode_documents(docs)
+        return [{}] * len(docs)
+
+
+bm25 = _LazyBM25()
+
+
+def get_bm25_encoder():
+    return bm25
+
 
 MASTER_INDEX_NAME = getattr(settings, "PINECONE_INDEX_NAME", "legal-enterprise-knowledge-base")
+
+
+SECTOR_STOPWORDS = {
+    "inc",
+    "ltd",
+    "corp",
+    "corporation",
+    "llc",
+    "the",
+    "and",
+    "holdings",
+    "group",
+    "services",
+    "energy",
+    "sciences",
+    "therapeutics",
+    "biopharma",
+    "pharma",
+    "pharmaceutical",
+    "pharmaceuticals",
+    "technologies",
+    "technology",
+    "partners",
+    "management",
+    "international",
+    "global",
+    "systems",
+    "capital",
+    "health",
+    "healthcare",
+    "medical",
+    "solutions",
+    "agreement",
+    "agreements",
+    "contract",
+    "contractor",
+    "customer",
+    "party",
+    "parties",
+}
+
+
+def _build_distinctive_tokens(company_str: str) -> list[str]:
+    """Extracts distinctive corporate tokens, avoiding generic sector stopwords."""
+    if not company_str:
+        return []
+    clean = company_str.replace(".", " ").replace(",", " ").replace("-", " ").replace(";", " ").strip()
+    words = [w.strip() for w in clean.split() if len(w.strip()) > 2]
+    distinctive = [w for w in words if w.lower() not in SECTOR_STOPWORDS]
+
+    tokens = set(distinctive)
+    if len(words) >= 2:
+        tokens.add("".join(words))  # e.g. BloomEnergyCorp, ExactSciencesCorp
+    if distinctive and len(distinctive) >= 2:
+        tokens.add("".join(distinctive))
+
+    # Add company-specific known synonyms if applicable
+    for w in list(tokens):
+        if w.lower() == "inmode":
+            tokens.add("Invasix")
+            tokens.add("InmodeLtd")
+        elif w.lower() == "exact":
+            tokens.add("ExactSciences")
+            tokens.add("ExactSciencesCorp")
+        elif w.lower() == "upjohn":
+            tokens.add("UpjohnInc")
+        elif w.lower() == "bloom":
+            tokens.add("BloomEnergy")
+            tokens.add("BloomEnergyCorp")
+        elif w.lower() == "aimmune":
+            tokens.add("AimmuneTherapeutics")
+            tokens.add("AimmuneTherapeuticsInc")
+
+    return [t for t in tokens if len(t) > 2]
 
 
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=1, max=5),
     reraise=True,
-    #    before_sleep=before_sleep_log(logfire, "warning"),
 )
-def _search_enterprise_knowledge(query: str, folder_name: str = None, limit: int = 8):
-    """Internal hybrid/dense search with retry logic and optional metadata filtering."""
+def _search_enterprise_knowledge(
+    query: str,
+    folder_name: str = None,
+    filter_dict: dict = None,
+    limit: int = 40,
+):
+    """Internal hybrid/dense search with retry logic, metadata/entity filtering and soft fallback."""
     qdrant = get_qdrant_client()
     if qdrant:
-        collection_name = getattr(settings, "QDRANT_COLLECTION", "enterprise_rag")
+        collection_name = (
+            getattr(settings, "QDRANT_COLLECTION", None) or os.getenv("QDRANT_COLLECTION") or "enterprise_rag_v1"
+        )
         dense_vector = embed_query(query)
 
-        qdrant_filter = None
+        must_conditions = []
         if folder_name:
-            qdrant_filter = Filter(must=[FieldCondition(key="folder_name", match=MatchValue(value=folder_name))])
+            must_conditions.append(FieldCondition(key="folder_name", match=MatchValue(value=folder_name)))
 
-        res = qdrant.query_points(
-            collection_name=collection_name,
-            query=dense_vector,
-            query_filter=qdrant_filter,
-            limit=limit,
-        )
+        should_conditions = []
+        if filter_dict and isinstance(filter_dict, dict):
+            company = filter_dict.get("company", "")
+            tokens = _build_distinctive_tokens(company)
+            for t in tokens:
+                for field in ("source", "Parties"):
+                    should_conditions.append(FieldCondition(key=field, match=MatchText(text=t)))
+
+        # 1. Attempt targeted entity-filtered search
+        points = []
+        if should_conditions:
+            q_filter = Filter(
+                must=must_conditions if must_conditions else None,
+                should=should_conditions,
+            )
+            try:
+                res = qdrant.query_points(
+                    collection_name=collection_name,
+                    query=dense_vector,
+                    query_filter=q_filter,
+                    limit=limit,
+                )
+                points = list(res.points)
+            except Exception as fe:
+                print(f"Note: Qdrant filtered query warning ({fe}), will use fallback.")
+
+        # 2. Fallback: If filtered returned zero points or no filter applied, query dense knowledge base
+        if not points:
+            unfiltered_filter = Filter(must=must_conditions) if must_conditions else None
+            fallback_res = qdrant.query_points(
+                collection_name=collection_name,
+                query=dense_vector,
+                query_filter=unfiltered_filter,
+                limit=limit,
+            )
+            points = list(fallback_res.points)
 
         results = []
-        for point in res.points:
+        for point in points:
             payload = point.payload or {}
             results.append(
                 {
                     "content": payload.get("text", ""),
                     "source": payload.get("source", "Unknown"),
                     "folder": payload.get("folder_name", "Unknown"),
-                    "score": point.score,
+                    "score": getattr(point, "score", 0.0),
                 }
             )
         return results
@@ -175,13 +323,23 @@ def _search_enterprise_knowledge(query: str, folder_name: str = None, limit: int
     return results
 
 
-def search_enterprise_knowledge(query: str, folder_name: str = None, limit: int = 8):
+def search_enterprise_knowledge(
+    query: str,
+    folder_name: str = None,
+    filter_dict: dict = None,
+    limit: int = 30,
+):
     """
     Performs a high-precision search in the enterprise knowledge base.
-    Optionally filters by `folder_name` metadata.
+    Optionally filters by `folder_name` and structured entity `filter_dict` metadata.
     """
     try:
-        return _search_enterprise_knowledge(query, folder_name=folder_name, limit=limit)
+        return _search_enterprise_knowledge(
+            query,
+            folder_name=folder_name,
+            filter_dict=filter_dict,
+            limit=limit,
+        )
     except Exception as e:
         # logfire.error(f"❌ Vector Search Failed after retries: {e}")
         print(f"❌ Vector Search Failed after retries: {e}")

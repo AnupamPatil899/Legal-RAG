@@ -1,0 +1,305 @@
+{
+  "experiments": {
+    "faithfulness": [
+      {
+        "question": "Under the Inmode Ltd. Turn-Key Manufacturing Agreement, who are t",
+        "faithfulness": 1.0
+      },
+      {
+        "question": "Under the Inmode Ltd. Turn-Key Manufacturing Agreement, what stan",
+        "faithfulness": 1.0
+      },
+      {
+        "question": "Under the Inmode Ltd. Turn-Key Manufacturing Agreement, what are ",
+        "faithfulness": 0.6
+      },
+      {
+        "question": "Under the Inmode Ltd. Turn-Key Manufacturing Agreement, how do pa",
+        "faithfulness": 0.917
+      },
+      {
+        "question": "Under the Upjohn Inc. 10-12G Agreement (2020), what is the proces",
+        "faithfulness": 0.333
+      },
+      {
+        "question": "Under the Upjohn Inc. 10-12G Agreement (2020), what defines the c",
+        "faithfulness": 0.333
+      },
+      {
+        "question": "Under the Exact Sciences Corp Promotion Agreement (2018), how is ",
+        "faithfulness": 1.0
+      },
+      {
+        "question": "Under the Bloom Energy Corp DRS/A (2018) Facility Services Agreem",
+        "faithfulness": 0.636
+      },
+      {
+        "question": "What agreement details is in the EXACT SCIENCES CORP 8-K from 201",
+        "faithfulness": 1.0
+      },
+      {
+        "question": "Under the Aimmune Therapeutics Inc. 8-K (2020) Agreement, what re",
+        "faithfulness": 0.5
+      },
+      {
+        "question": "As a Supplier Quality Engineer, I need to understand the agreeman",
+        "faithfulness": 0.8
+      },
+      {
+        "question": "Under the Aimmune Therapeutics Inc. 8-K (2020) Agreement, what ma",
+        "faithfulness": 0.2
+      }
+    ],
+    "answer_relevancy": [
+      {
+        "question": "Under the Inmode Ltd. Turn-Key Manufacturing Agreement, who are t",
+        "answer_relevancy": 0.502
+      },
+      {
+        "question": "Under the Inmode Ltd. Turn-Key Manufacturing Agreement, what stan",
+        "answer_relevancy": 0.83
+      },
+      {
+        "question": "Under the Inmode Ltd. Turn-Key Manufacturing Agreement, what are ",
+        "answer_relevancy": 0.918
+      },
+      {
+        "question": "Under the Inmode Ltd. Turn-Key Manufacturing Agreement, how do pa",
+        "answer_relevancy": 0.775
+      },
+      {
+        "question": "Under the Upjohn Inc. 10-12G Agreement (2020), what is the proces",
+        "answer_relevancy": 0.0
+      },
+      {
+        "question": "Under the Upjohn Inc. 10-12G Agreement (2020), what defines the c",
+        "answer_relevancy": 0.0
+      },
+      {
+        "question": "Under the Exact Sciences Corp Promotion Agreement (2018), how is ",
+        "answer_relevancy": 0.644
+      },
+      {
+        "question": "Under the Bloom Energy Corp DRS/A (2018) Facility Services Agreem",
+        "answer_relevancy": 0.502
+      },
+      {
+        "question": "What agreement details is in the EXACT SCIENCES CORP 8-K from 201",
+        "answer_relevancy": 0.0
+      },
+      {
+        "question": "Under the Aimmune Therapeutics Inc. 8-K (2020) Agreement, what re",
+        "answer_relevancy": 0.752
+      },
+      {
+        "question": "As a Supplier Quality Engineer, I need to understand the agreeman",
+        "answer_relevancy": 0.545
+      },
+      {
+        "question": "Under the Aimmune Therapeutics Inc. 8-K (2020) Agreement, what ma",
+        "answer_relevancy": 0.691
+      }
+    ],
+    "context_precision": [
+      {
+        "question": "Under the Inmode Ltd. Turn-Key Manufacturing Agreement, who are t",
+        "context_precision": 1.0
+      },
+      {
+        "question": "Under the Inmode Ltd. Turn-Key Manufacturing Agreement, what stan",
+        "context_precision": 0.759
+      },
+      {
+        "question": "Under the Inmode Ltd. Turn-Key Manufacturing Agreement, what are ",
+        "context_precision": 0.874
+      },
+      {
+        "question": "Under the Inmode Ltd. Turn-Key Manufacturing Agreement, how do pa",
+        "context_precision": 1.0
+      },
+      {
+        "question": "Under the Upjohn Inc. 10-12G Agreement (2020), what is the proces",
+        "context_precision": 0.0
+      },
+      {
+        "question": "Under the Upjohn Inc. 10-12G Agreement (2020), what defines the c",
+        "context_precision": 1.0
+      },
+      {
+        "question": "Under the Exact Sciences Corp Promotion Agreement (2018), how is ",
+        "context_precision": 0.333
+      },
+      {
+        "question": "Under the Bloom Energy Corp DRS/A (2018) Facility Services Agreem",
+        "context_precision": 0.5
+      },
+      {
+        "question": "What agreement details is in the EXACT SCIENCES CORP 8-K from 201",
+        "context_precision": 0.0
+      },
+      {
+        "question": "Under the Aimmune Therapeutics Inc. 8-K (2020) Agreement, what re",
+        "context_precision": 0.917
+      },
+      {
+        "question": "As a Supplier Quality Engineer, I need to understand the agreeman",
+        "context_precision": 1.0
+      },
+      {
+        "question": "Under the Aimmune Therapeutics Inc. 8-K (2020) Agreement, what ma",
+        "context_precision": 1.0
+      }
+    ],
+    "context_recall": [
+      {
+        "question": "Under the Inmode Ltd. Turn-Key Manufacturing Agreement, who are t",
+        "context_recall": 1.0
+      },
+      {
+        "question": "Under the Inmode Ltd. Turn-Key Manufacturing Agreement, what stan",
+        "context_recall": 1.0
+      },
+      {
+        "question": "Under the Inmode Ltd. Turn-Key Manufacturing Agreement, what are ",
+        "context_recall": 1.0
+      },
+      {
+        "question": "Under the Inmode Ltd. Turn-Key Manufacturing Agreement, how do pa",
+        "context_recall": 0.833
+      },
+      {
+        "question": "Under the Upjohn Inc. 10-12G Agreement (2020), what is the proces",
+        "context_recall": 0.0
+      },
+      {
+        "question": "Under the Upjohn Inc. 10-12G Agreement (2020), what defines the c",
+        "context_recall": 1.0
+      },
+      {
+        "question": "Under the Exact Sciences Corp Promotion Agreement (2018), how is ",
+        "context_recall": 0.333
+      },
+      {
+        "question": "Under the Bloom Energy Corp DRS/A (2018) Facility Services Agreem",
+        "context_recall": 0.4
+      },
+      {
+        "question": "What agreement details is in the EXACT SCIENCES CORP 8-K from 201",
+        "context_recall": 1.0
+      },
+      {
+        "question": "Under the Aimmune Therapeutics Inc. 8-K (2020) Agreement, what re",
+        "context_recall": 1.0
+      },
+      {
+        "question": "As a Supplier Quality Engineer, I need to understand the agreeman",
+        "context_recall": 1.0
+      },
+      {
+        "question": "Under the Aimmune Therapeutics Inc. 8-K (2020) Agreement, what ma",
+        "context_recall": 1.0
+      }
+    ],
+    "answer_correctness": [
+      {
+        "question": "Under the Inmode Ltd. Turn-Key Manufacturing Agreement, who are t",
+        "answer_correctness": 0.493
+      },
+      {
+        "question": "Under the Inmode Ltd. Turn-Key Manufacturing Agreement, what stan",
+        "answer_correctness": 0.474
+      },
+      {
+        "question": "Under the Inmode Ltd. Turn-Key Manufacturing Agreement, what are ",
+        "answer_correctness": 0.598
+      },
+      {
+        "question": "Under the Inmode Ltd. Turn-Key Manufacturing Agreement, how do pa",
+        "answer_correctness": 0.41
+      },
+      {
+        "question": "Under the Upjohn Inc. 10-12G Agreement (2020), what is the proces",
+        "answer_correctness": 0.113
+      },
+      {
+        "question": "Under the Upjohn Inc. 10-12G Agreement (2020), what defines the c",
+        "answer_correctness": 0.136
+      },
+      {
+        "question": "Under the Exact Sciences Corp Promotion Agreement (2018), how is ",
+        "answer_correctness": 0.358
+      },
+      {
+        "question": "Under the Bloom Energy Corp DRS/A (2018) Facility Services Agreem",
+        "answer_correctness": 0.461
+      },
+      {
+        "question": "What agreement details is in the EXACT SCIENCES CORP 8-K from 201",
+        "answer_correctness": 0.184
+      },
+      {
+        "question": "Under the Aimmune Therapeutics Inc. 8-K (2020) Agreement, what re",
+        "answer_correctness": 0.138
+      },
+      {
+        "question": "As a Supplier Quality Engineer, I need to understand the agreeman",
+        "answer_correctness": 0.187
+      },
+      {
+        "question": "Under the Aimmune Therapeutics Inc. 8-K (2020) Agreement, what ma",
+        "answer_correctness": 0.389
+      }
+    ],
+    "tool_correctness": [
+      {
+        "question": "Under the Inmode Ltd. Turn-Key Manufacturing Agreement, who are t",
+        "tool_correctness": 1.0
+      },
+      {
+        "question": "Under the Inmode Ltd. Turn-Key Manufacturing Agreement, what stan",
+        "tool_correctness": 1.0
+      },
+      {
+        "question": "Under the Inmode Ltd. Turn-Key Manufacturing Agreement, what are ",
+        "tool_correctness": 1.0
+      },
+      {
+        "question": "Under the Inmode Ltd. Turn-Key Manufacturing Agreement, how do pa",
+        "tool_correctness": 1.0
+      },
+      {
+        "question": "Under the Upjohn Inc. 10-12G Agreement (2020), what is the proces",
+        "tool_correctness": 1.0
+      },
+      {
+        "question": "Under the Upjohn Inc. 10-12G Agreement (2020), what defines the c",
+        "tool_correctness": 1.0
+      },
+      {
+        "question": "Under the Exact Sciences Corp Promotion Agreement (2018), how is ",
+        "tool_correctness": 1.0
+      },
+      {
+        "question": "Under the Bloom Energy Corp DRS/A (2018) Facility Services Agreem",
+        "tool_correctness": 1.0
+      },
+      {
+        "question": "What agreement details is in the EXACT SCIENCES CORP 8-K from 201",
+        "tool_correctness": 1.0
+      },
+      {
+        "question": "Under the Aimmune Therapeutics Inc. 8-K (2020) Agreement, what re",
+        "tool_correctness": 1.0
+      },
+      {
+        "question": "As a Supplier Quality Engineer, I need to understand the agreeman",
+        "tool_correctness": 1.0
+      },
+      {
+        "question": "Under the Aimmune Therapeutics Inc. 8-K (2020) Agreement, what ma",
+        "tool_correctness": 1.0
+      }
+    ]
+  },
+  "sample_cache": {}
+}
