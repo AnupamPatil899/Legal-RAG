@@ -1,4 +1,4 @@
-# ClauseAI — Agentic Legal Document Intelligence Engine
+# ClauseAI: Agentic Legal Document Intelligence Engine
 
 A production-grade, enterprise-level **legal contract RAG system** built with **LangGraph**, **Portkey LLM Gateway**, **Qdrant Vector Database**, and **Jina AI Embeddings/Reranker**. ClauseAI retrieves and reasons over SEC contract filings, distinguishes between technical "True Data" and random "Noisy Data" using semantic re-ranking, history-aware planning, and NeMo Guardrails for input/output safety.
 
@@ -65,15 +65,19 @@ graph TD
     Responder -.->|Conversation History| Memory[(LangGraph<br/>Postgres Checkpointer)]
 
     subgraph Evaluation Suite
-        Judge[OpenRouter 70B Judge] -.-> Metrics[RAGAS Metrics<br/>6 Experiments]
-        Metrics -.-> Dashboard[Streamlit Eval Dashboard<br/>3-Tab UI]
+        Golden[(Golden Dataset<br/>12 SEC Samples)] --> Metrics
+        Judge[OpenRouter 70B Judge] --> Metrics[RAGAS Metrics<br/>6 Core Benchmarks]
+        Metrics --> Dashboard[Streamlit Eval Dashboard<br/>3-Tab UI]
     end
+
+    Responder -.->|Benchmark & Quality Eval| Metrics
 
     style Guard fill:#ff6b6b,stroke:#c0392b,color:#fff
     style Qdrant fill:#4ecdc4,stroke:#1a535c,color:#fff
     style Portkey fill:#a29bfe,stroke:#6c5ce7,color:#fff
     style Memory fill:#ffeaa7,stroke:#fdcb6e,color:#333
     style Reranker fill:#74b9ff,stroke:#0984e3,color:#fff
+    style Dashboard fill:#55efc4,stroke:#00b894,color:#2d3436
 ```
 
 ---
